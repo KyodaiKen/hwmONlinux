@@ -1,0 +1,54 @@
+webServer:
+  host: '*'
+  port: 8085
+  contentRoot: ./wwwroot
+sensorData:
+  dataRetentionSeconds: 120
+sensorProviders:
+  - type: "HwMonLinux.KKFC01SensorDataProvider, HwmONlinuxServer"
+    config:
+      friendlyName: "Fan Controller FC02"
+      portName: "/dev/ttyUSB0"
+      baudRate: 115200
+      queryCommand: "bs"
+      identificationString: "KyoudaiKen FC02"
+  - type: "HwMonLinux.LmsensorsSensorDataProvider, HwmONlinuxServer"
+    config:
+      friendlyName: "LMSensors"
+      filterRegex: "^(nct6798-isa-0290-fan2|nct6798-isa-0290-fan7|nct6798-isa-0290-PCH_CHIP_TEMP|coretemp-isa-0000-Package id 0)$"
+      sensorNameOverrides:
+        nct6798-isa-0290-fan2: "Rad (RPM)"
+        nct6798-isa-0290-fan7: "Pump (RPM)"
+        nct6798-isa-0290-PCH_CHIP_TEMP: "PCH (°C)"
+        "coretemp-isa-0000-Package id 0": "CPU Package (°C)"
+  - type: "HwMonLinux.NvidiaSmiSensorDataProvider, HwmONlinuxServer"
+    config:
+      friendlyName: "NVidia RTX 3090"
+      queriedSensors:
+        - "temperature.gpu"
+        - "utilization.gpu"
+        - "utilization.memory"
+        - "utilization.encoder"
+        - "utilization.decoder"
+        - "utilization.ofa"
+        - "memory.used"
+        - "power.draw.instant"
+        - "clocks.current.graphics"
+        - "clocks.current.sm"
+        - "clocks.current.memory"
+      sensorNameOverrides:
+        "temperature.gpu": "Core Temperature"
+        "utilization.gpu": "Core Load"
+        "utilization.memory": "Memory Controller Load"
+        "utilization.encoder": "Encoder Load"
+        "utilization.decoder": "Decoder Load"
+        "utilization.ofa": "Optical Flow Accelerator Engine Load"
+        "memory.used": "Memory Used"
+        "power.draw.instant": "Power"
+        "clocks.current.graphics": "Graphics Clock "
+        "clocks.current.sm": "Streaming Multiprocessor Clock"
+        "clocks.current.memory": "Memory Clock"
+  - type: "HwMonLinux.IntelPackagePowerDataProvider, HwmONlinuxServer"
+    config:
+      friendlyName: "Intel Core i9-13900KS"
+      energyFilePath: "/sys/class/powercap/intel-rapl/intel-rapl:0/energy_uj"

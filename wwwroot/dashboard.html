@@ -1,0 +1,270 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sensor Dashboard</title>
+    <style>
+        body {
+            font-family: sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: #000; /* Dark background */
+            color: #d4d4d4; /* Light text */
+        }
+
+        .container {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            justify-content: flex-start;
+        }
+
+        .group {
+            background-color: #151515; /* Darker group background */
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3); /* Darker shadow */
+            padding: 20px;
+            margin-bottom: 20px;
+            width: calc(100%); /* Default full width for portrait phone */
+            box-sizing: border-box;
+            border: 1px solid #333; /* Subtle border */
+        }
+
+        /* Portrait phone */
+        @media (orientation: portrait) and (max-width: 767px) {
+            .group {
+                width: calc(100%); /* Two columns in landscape */
+            }
+        }
+
+        /* Landscape phone */
+        @media (orientation: landscape) and (max-width: 767px) {
+            .group {
+                width: calc(50%); /* Two columns in landscape */
+            }
+        }
+
+        /* Tablet (portrait or landscape) */
+        @media (min-width: 768px) and (max-width: 1023px) {
+            .group {
+                width: calc(33.333333333% - 10px); /* Three columns on tablet */
+            }
+        }
+
+        /* Desktop */
+        @media (min-width: 1024px) {
+            .group {
+                width: calc(33.333333333% - 10px); /* Three columns on desktop */
+            }
+        }
+
+        .group-header {
+            font-size: 1.5em;
+            margin-bottom: 10px;
+            color: #00bfff; /* Highlight color */
+            border-bottom: 1px solid #555; /* Darker border */
+            padding-bottom: 5px;
+        }
+
+        .chart-container {
+            width: 100%;
+            height: auto;
+            min-height: 14em;
+            margin-bottom: 2em;
+            max-height: 14em;
+            /* No background color here to inherit or be transparent */
+        }
+
+        .chart-container canvas {
+            width: 100% !important;
+            height: auto !important;
+            display: block;
+            background-color: #101010; /* Dark background for the chart area */
+            border-radius: 4px; /* Optional: round the chart area */
+        }
+
+        .latest-value {
+            font-size: 0.9em;
+            font-weight: bold;
+            color: #00bfff; /* Slightly lighter text for latest value */
+            margin-top: 5px;
+        }
+    </style>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+    <h1>Sensor Dashboard</h1>
+    <div class="container">
+        </div>
+        <script>
+            let chartInstances = {}; // To store chart instances
+            let latestValues = {}; // To store the latest values for display
+    
+            function initializeCharts(container, groupedData) {
+                container.innerHTML = ''; // Clear the container initially
+                chartInstances = {}; // Reset chart instances
+                latestValues = {}; // Reset latest values
+
+                for (const friendlyName in groupedData) { // Use friendlyName as the group header
+                    const groupDiv = document.createElement('div');
+                    groupDiv.classList.add('group');
+                    groupDiv.innerHTML = `<h2 class="group-header">${friendlyName}</h2>`;
+                    container.appendChild(groupDiv);
+    
+                    for (const sensorName in groupedData[friendlyName]) {
+                        const chartDiv = document.createElement('div');
+                        chartDiv.classList.add('chart-container');
+                        const canvas = document.createElement('canvas');
+                        chartDiv.appendChild(canvas);
+
+                        // Add a div to display the latest value
+                        const latestValueDiv = document.createElement('div');
+                        latestValueDiv.classList.add('latest-value');
+                        latestValueDiv.textContent = 'Current: N/A'; // Initial text
+                        chartDiv.appendChild(latestValueDiv);
+
+                        groupDiv.appendChild(chartDiv);
+    
+                        const ctx = canvas.getContext('2d');
+                        const newChart = new Chart(ctx, {
+                            type: 'line',
+                            data: {
+                                labels: groupedData[friendlyName][sensorName].map(item => item.x),
+                                datasets: [{
+                                    label: sensorName,
+                                    data: groupedData[friendlyName][sensorName].map(item => item.y),
+                                    borderColor: '#00bfff',
+                                    borderWidth: 1,
+                                    pointRadius: 0,
+                                    tension: 0,
+                                    fill: true,
+                                    backgroundColor: (context) => {
+                                        const chart = context.chart;
+                                        const { ctx, chartArea, scales } = chart;
+
+                                        if (!chartArea || !scales.y) {
+                                            return null;
+                                        }
+
+                                        const gradient = ctx.createLinearGradient(0, scales.y.bottom, 0, scales.y.top);
+                                        gradient.addColorStop(0, 'rgba(0, 191, 255, 0.4)'); // Start color (adjust alpha for transparency)
+                                        gradient.addColorStop(1, 'rgba(0, 191, 255, 1)'); // End color (fully transparent)
+
+                                        return gradient;
+                                    }
+                                }]
+                            },
+                            options: {
+                                responsive: true,
+                                maintainAspectRatio: false,
+                                animation: false,
+                                scales: {
+                                    x: {
+                                        type: 'category',
+                                        display: true
+                                    },
+                                    y: {
+                                        beginAtZero: false,
+                                        title: {
+                                            display: false,
+                                            /* text: sensorName.split('(')[0].trim() */
+                                        }
+                                    }
+                                },
+                                plugins: {
+                                    legend: {
+                                        display: true,
+                                        labels: {
+                                            boxWidth: 0,           // Remove the color box
+                                            font: {
+                                                size: 14,          // Increase the font size
+                                                weight: 'bold'     // Make the text bolder (you can adjust)
+                                            },
+                                            color: '#eee'         // Brighter text color
+                                        }
+                                    }
+                                }
+                            }
+                        });
+                        chartInstances[`${friendlyName}-${sensorName}`] = newChart;
+                    }
+                }
+            }
+    
+            function updateCharts(groupedData) {
+                for (const friendlyName in groupedData) { // Use friendlyName to access the group data
+                    for (const sensorName in groupedData[friendlyName]) {
+                        const chartKey = `${friendlyName}-${sensorName}`;
+                        if (chartInstances[chartKey]) {
+                            const dataPoints = groupedData[friendlyName][sensorName];
+                            chartInstances[chartKey].data.labels = groupedData[friendlyName][sensorName].map(item => item.x);
+                            chartInstances[chartKey].data.datasets[0].data = groupedData[friendlyName][sensorName].map(item => item.y);
+                            chartInstances[chartKey].update('none'); // 'none' for immediate update
+
+                            // Update the latest value display
+                            const latestValueDiv = chartInstances[chartKey].canvas.parentNode.querySelector('.latest-value');
+                            if (dataPoints && dataPoints.length > 0) {
+                                const latestValueRaw = parseFloat(dataPoints[dataPoints.length - 1].y);
+                                const latestValueFormatted = (Number.isInteger(latestValueRaw) ? latestValueRaw : latestValueRaw.toFixed(2));
+                                latestValues[chartKey] = latestValueFormatted;
+                                latestValueDiv.textContent = `Current: ${latestValueFormatted}`;
+                            } else {
+                                latestValueDiv.textContent = 'Current: N/A';
+                            }
+                        }
+                    }
+                }
+            }
+    
+            async function fetchData() {
+                try {
+                    const response = await fetch('/sensors/all');
+                    if (!response.ok) {
+                        console.error('Failed to fetch sensor data:', response.status);
+                        document.querySelector('.container').innerHTML = '<p class="error">Failed to load sensor data.</p>';
+                        return;
+                    }
+                    const sensorData = await response.json();
+
+                    const groupedData = {};
+                    for (const friendlyName in sensorData) { // Iterate over the friendly names from the JSON
+                        if (!groupedData[friendlyName]) {
+                            groupedData[friendlyName] = {};
+                        }
+                        for (const sensorType in sensorData[friendlyName]) {
+                            const sensorReadings = sensorData[friendlyName][sensorType];
+                            if (sensorReadings && sensorReadings.length > 0) {
+                                const firstReading = sensorReadings[0];
+                                for (const actualSensorName in firstReading.Values) {
+                                    const chartLabel = `${actualSensorName}`;
+                                    if (!groupedData[friendlyName][chartLabel]) {
+                                        groupedData[friendlyName][chartLabel] = [];
+                                    }
+                                    groupedData[friendlyName][chartLabel].push(...sensorReadings.map(item => ({
+                                        x: new Date(item.Timestamp).toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' }),
+                                        y: item.Values[actualSensorName]
+                                    })));
+                                }
+                            }
+                        }
+                    }
+                    const container = document.querySelector('.container');
+                    if (Object.keys(chartInstances).length === 0) {
+                        initializeCharts(container, groupedData);
+                    } else {
+                        updateCharts(groupedData);
+                    }
+                } catch (error) {
+                    console.error('Error fetching or processing data:', error);
+                    document.querySelector('.container').innerHTML = '<p class="error">Failed to load sensor data.</p>';
+                }
+            }
+    
+            window.addEventListener('load', () => {
+                fetchData();
+                setInterval(fetchData, 1000);
+            });
+        </script>
+</body>
+</html>
