@@ -12,7 +12,7 @@ namespace HwMonLinux
         public string FriendlyName { get; }
         private readonly List<string> _queriedSensors;
         private readonly Dictionary<string, string> _sensorNameOverrides;
-        private readonly Dictionary<string, string> _sensorUnits = new Dictionary<string, string>
+        /*private readonly Dictionary<string, string> _sensorUnits = new Dictionary<string, string>
         {
             { "temperature.gpu", "°C" },
             { "temperature.memory", "°C" },
@@ -36,7 +36,7 @@ namespace HwMonLinux
             { "bar1.free", "MB" },
             { "bar1.used", "MB" }
             // Add units for other relevant metrics if needed
-        };
+        };*/
 
         // A list of all possible nvidia-smi query options (as of a certain point).
         // This list might need to be updated with newer driver versions.
@@ -71,6 +71,7 @@ namespace HwMonLinux
             "utilization.memory",
             "utilization.encoder",
             "utilization.decoder",
+            "utilization.ofa",
             "ecc.mode.current",
             "ecc.errors.corrected.total",
             "ecc.errors.uncorrected.total",
@@ -143,10 +144,10 @@ namespace HwMonLinux
                             string friendlySensorName = _sensorNameOverrides.ContainsKey(rawSensorName) ? _sensorNameOverrides[rawSensorName] : rawSensorName;
                             string fullSensorNameWithUnit = friendlySensorName;
 
-                            if (_sensorUnits.TryGetValue(rawSensorName, out string unit))
+                            /*if (_sensorUnits.TryGetValue(rawSensorName, out string unit))
                             {
                                 fullSensorNameWithUnit += $" ({unit})";
-                            }
+                            }*/
 
                             if (float.TryParse(values[j], NumberStyles.Float, CultureInfo.InvariantCulture, out float floatValue))
                             {

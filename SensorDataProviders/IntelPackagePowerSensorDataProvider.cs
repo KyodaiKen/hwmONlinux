@@ -8,7 +8,7 @@ using System.Threading.Tasks;
 
 namespace HwMonLinux
 {
-    public class IntelPackagePowerDataProvider : ISensorDataProvider
+    public class IntelPackagePowerSensorDataProvider : ISensorDataProvider
     {
         public string Name => "IntelPackagePower";
         public string FriendlyName { get; }
@@ -16,7 +16,7 @@ namespace HwMonLinux
         private ulong _previousEnergyMicroJoules = 0;
         private DateTime _previousReadTime = DateTime.MinValue;
 
-        public IntelPackagePowerDataProvider(string friendlyName, string energyFilePath = "/sys/class/powercap/intel-rapl/intel-rapl:0/energy_uj")
+        public IntelPackagePowerSensorDataProvider(string friendlyName, string energyFilePath = "/sys/class/powercap/intel-rapl/intel-rapl:0/energy_uj")
         {
             FriendlyName = friendlyName;
             _energyFilePath = energyFilePath;

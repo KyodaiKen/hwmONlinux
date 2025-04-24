@@ -8,7 +8,7 @@
         body {
             font-family: sans-serif;
             margin: 0;
-            padding: 20px;
+            padding: 10px;
             background-color: #000; /* Dark background */
             color: #d4d4d4; /* Light text */
         }
@@ -16,7 +16,7 @@
         .container {
             display: flex;
             flex-wrap: wrap;
-            gap: 10px;
+            gap: 6px;
             justify-content: flex-start;
         }
 
@@ -24,56 +24,48 @@
             background-color: #151515; /* Darker group background */
             border-radius: 8px;
             box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3); /* Darker shadow */
-            padding: 20px;
-            margin-bottom: 20px;
-            width: calc(100%); /* Default full width for portrait phone */
+            padding: 10px;
+            margin-bottom: 6px;
+            width: 100%; /* Always full width */
             box-sizing: border-box;
-            border: 1px solid #333; /* Subtle border */
-        }
-
-        /* Portrait phone */
-        @media (orientation: portrait) and (max-width: 767px) {
-            .group {
-                width: calc(100%); /* Two columns in landscape */
-            }
-        }
-
-        /* Landscape phone */
-        @media (orientation: landscape) and (max-width: 767px) {
-            .group {
-                width: calc(50%); /* Two columns in landscape */
-            }
-        }
-
-        /* Tablet (portrait or landscape) */
-        @media (min-width: 768px) and (max-width: 1023px) {
-            .group {
-                width: calc(33.333333333% - 10px); /* Three columns on tablet */
-            }
-        }
-
-        /* Desktop */
-        @media (min-width: 1024px) {
-            .group {
-                width: calc(33.333333333% - 10px); /* Three columns on desktop */
-            }
+            border: 1px solid #222; /* Subtle border */
+            display: flex; /* Enable flexbox for chart containers within the group */
+            flex-wrap: wrap; /* Allow charts to wrap to the next line */
+            gap: 6px; /* Gap between charts within the group */
+            align-items: flex-start; /* Align items to the start to avoid stretching */
         }
 
         .group-header {
-            font-size: 1.5em;
-            margin-bottom: 10px;
+            font-size: 1.125em;
+            margin-bottom: 0.125em;
+            margin-top: 0;
             color: #00bfff; /* Highlight color */
-            border-bottom: 1px solid #555; /* Darker border */
+            border-bottom: 1px solid #222; /* Darker border */
             padding-bottom: 5px;
+            width: 100%; /* Ensure header takes full width */
         }
 
         .chart-container {
-            width: 100%;
+            width: calc(12.5% - 6px); /* Default to three charts per line */
             height: auto;
-            min-height: 14em;
-            margin-bottom: 2em;
-            max-height: 14em;
-            /* No background color here to inherit or be transparent */
+            min-height: 10em;
+            margin-bottom: 1.2em;
+            max-height: 10em;
+            box-sizing: border-box; /* Ensure padding and border are included in the width */
+        }
+
+        /* Adjust chart width for smaller screens in portrait */
+        @media (max-width: 767px) and (orientation: portrait) {
+            .chart-container {
+                width: calc(50% - 6px); /* Two charts per line in portrait mode */
+            }
+        }
+
+        /* Adjust chart width for landscape orientation on phones */
+        @media (max-width: 991px) and (orientation: landscape) {
+            .chart-container {
+                width: calc(25% - 6px); /* Three charts per line in landscape mode */
+            }
         }
 
         .chart-container canvas {
@@ -87,184 +79,255 @@
         .latest-value {
             font-size: 0.9em;
             font-weight: bold;
-            color: #00bfff; /* Slightly lighter text for latest value */
+            color: #00bfff;
             margin-top: 5px;
         }
     </style>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 <body>
-    <h1>Sensor Dashboard</h1>
     <div class="container">
-        </div>
-        <script>
-            let chartInstances = {}; // To store chart instances
-            let latestValues = {}; // To store the latest values for display
-    
-            function initializeCharts(container, groupedData) {
-                container.innerHTML = ''; // Clear the container initially
-                chartInstances = {}; // Reset chart instances
-                latestValues = {}; // Reset latest values
+    </div>
+    <script>
+        let chartInstances = {}; // To store chart instances
+        let latestValues = {}; // To store the latest values for display
+        let initialLoadComplete = false;
 
-                for (const friendlyName in groupedData) { // Use friendlyName as the group header
+        async function initializeDashboard(configData) {
+            const container = document.querySelector('.container');
+            container.innerHTML = ''; // Clear initial content
+            chartInstances = {};
+            latestValues = {};
+
+            if (configData && configData.sensorGroups && Array.isArray(configData.sensorGroups)) {
+                for (const group of configData.sensorGroups) {
                     const groupDiv = document.createElement('div');
                     groupDiv.classList.add('group');
-                    groupDiv.innerHTML = `<h2 class="group-header">${friendlyName}</h2>`;
+                    groupDiv.innerHTML = `<h2 class="group-header">${group.friendlyName}</h2>`;
                     container.appendChild(groupDiv);
-    
-                    for (const sensorName in groupedData[friendlyName]) {
+                }
+            } else {
+                container.innerHTML = '<p class="info">No sensor groups defined in the received data.</p>';
+            }
+        }
+
+        function updateCharts(allSensorData) {
+            const container = document.querySelector('.container');
+            const existingGroups = Array.from(container.querySelectorAll('.group')).reduce((acc, curr) => {
+                const header = curr.querySelector('.group-header');
+                if (header) {
+                    acc[header.textContent] = curr;
+                }
+                return acc;
+            }, {});
+
+            const groupDefinitions = allSensorData.sensorGroups || [];
+            const providerData = allSensorData.providers || {};
+
+            for (const groupDef of groupDefinitions) {
+                const groupDiv = existingGroups[groupDef.friendlyName];
+                if (!groupDiv) continue;
+
+                const existingChartContainers = Array.from(groupDiv.querySelectorAll('.chart-container'));
+                let chartIndex = 0;
+
+                for (const identifier of groupDef.sensorIdentifiers) {
+                    let found = false;
+                    for (const providerName in providerData) {
+                        for (const sensorName in providerData[providerName]) {
+                            const currentIdentifier = `${providerName} ${sensorName}`;
+                            if (identifier === currentIdentifier && providerData[providerName][sensorName] && providerData[providerName][sensorName].length > 0) {
+                                const chartKey = `${groupDef.name}-${identifier}`;
+                                let chartDiv = existingChartContainers[chartIndex];
+                                let chart;
+
+                                const dataPoints = providerData[providerName][sensorName].map(item => ({
+                                    x: new Date(item.Timestamp).toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' }),
+                                    y: item.Value
+                                }));
+
+                                //Prepare chart setup
+                                const chartSetup = {
+                                    type: 'line',
+                                    data: {
+                                        labels: dataPoints.map(item => item.x),
+                                        datasets: [{
+                                            data: dataPoints.map(item => item.y),
+                                            borderColor: '#00bfff',
+                                            borderWidth: 1,
+                                            pointRadius: 0,
+                                            tension: 0,
+                                            fill: true,
+                                            backgroundColor: (context) => {
+                                                const chart = context.chart;
+                                                const { ctx, chartArea, scales } = chart;
+                                                if (!chartArea || !scales.y) return null;
+                                                const gradient = ctx.createLinearGradient(0, scales.y.bottom, 0, scales.y.top);
+                                                gradient.addColorStop(0, '#00bfff90');
+                                                gradient.addColorStop(1, '#00bfffFF');
+                                                return gradient;
+                                            }
+                                        }]
+                                    },
+                                    options: {
+                                        responsive: true,
+                                        maintainAspectRatio: false,
+                                        animation: false,
+                                        scales: {
+                                            x: { type: 'category', display: true, ticks: { font: { size: 10 }, color: '#00bfff80' } },
+                                            y: { beginAtZero: false, title: { display: false }, ticks: { font: { size: 11 }, color: '#00bfff80' } }
+                                        },
+                                        plugins: {
+                                            legend: { display: false},
+                                            title: {
+                                                display: true,
+                                                text: sensorName,
+                                                color: '#aaa',
+                                                font: {
+                                                    family: 'sans-serif',
+                                                    size: 14,
+                                                    weight: 'bold'
+                                                },
+                                                align: 'center',
+                                                padding: { 
+                                                    top: 10,
+                                                    bottom: 10
+                                                }
+                                            }
+                                        }
+                                    }
+                                };
+
+                                if (chartInstances[chartKey]) {
+                                    // Update existing chart
+                                    chart = chartInstances[chartKey];
+                                    chart.data.labels = dataPoints.map(item => item.x);
+                                    chart.data.datasets[0].data = dataPoints.map(item => item.y);
+                                    chart.update('none');
+
+                                    // Update latest value
+                                    const latestValueDiv = chartDiv.querySelector('.latest-value');
+                                    if (latestValueDiv && dataPoints.length > 0) {
+                                        const latestValueRaw = parseFloat(dataPoints[dataPoints.length - 1].y);
+                                        const latestValueFormatted = (Number.isInteger(latestValueRaw) ? latestValueRaw : latestValueRaw.toFixed(2));
+                                        latestValueDiv.textContent = `Current: ${latestValueFormatted}`;
+                                    }
+                                } else if (initialLoadComplete) {
+                                    // Create new chart if initial load is complete
+                                    chartDiv = document.createElement('div');
+                                    chartDiv.classList.add('chart-container');
+                                    const canvas = document.createElement('canvas');
+                                    chartDiv.appendChild(canvas);
+                                    const latestValueDiv = document.createElement('div');
+                                    latestValueDiv.classList.add('latest-value');
+                                    latestValueDiv.textContent = 'Current: N/A';
+                                    chartDiv.appendChild(latestValueDiv);
+                                    groupDiv.appendChild(chartDiv);
+
+                                    const ctx = canvas.getContext('2d');
+                                    const newChart = new Chart(ctx, chartSetup);
+                                    chartInstances[chartKey] = newChart;
+                                    if (dataPoints.length > 0) {
+                                        const latestValueRaw = parseFloat(dataPoints[dataPoints.length - 1].y);
+                                        const latestValueFormatted = (Number.isInteger(latestValueRaw) ? latestValueRaw : latestValueRaw.toFixed(2));
+                                        latestValues[chartKey] = latestValueFormatted;
+                                        latestValueDiv.textContent = `Current: ${latestValueFormatted}`;
+                                    }
+                                } else {
+                                    // Create initial chart structure for later updates
+                                    chartDiv = document.createElement('div');
+                                    chartDiv.classList.add('chart-container');
+                                    const canvas = document.createElement('canvas');
+                                    chartDiv.appendChild(canvas);
+                                    const latestValueDiv = document.createElement('div');
+                                    latestValueDiv.classList.add('latest-value');
+                                    latestValueDiv.textContent = 'Current: N/A';
+                                    chartDiv.appendChild(latestValueDiv);
+                                    groupDiv.appendChild(chartDiv);
+                                    const ctx = canvas.getContext('2d');
+                                    chartInstances[chartKey] = new Chart(ctx, chartSetup);
+                                    if (dataPoints.length > 0) {
+                                        const latestValueRaw = parseFloat(dataPoints[dataPoints.length - 1].y);
+                                        const latestValueFormatted = (Number.isInteger(latestValueRaw) ? latestValueRaw : latestValueRaw.toFixed(2));
+                                        latestValues[chartKey] = latestValueFormatted;
+                                        latestValueDiv.textContent = `Current: ${latestValueFormatted}`;
+                                    }
+                                }
+                                chartIndex++;
+                                found = true;
+                                break; // Move to the next identifier after finding a match
+                            }
+                        }
+                        if (found) break; // Move to the next identifier
+                    }
+                    // Handle cases where the identifier from config is not found in the current data
+                    if (!found && initialLoadComplete) {
+                        const chartKey = `${groupDef.name}-${identifier}`;
+                        if (chartInstances[chartKey]) {
+                            const chart = chartInstances[chartKey];
+                            chart.data.labels = [];
+                            chart.data.datasets[0].data = [];
+                            chart.update('none');
+                            const latestValueDiv = existingChartContainers[chartIndex]?.querySelector('.latest-value');
+                            if (latestValueDiv) latestValueDiv.textContent = 'Current: N/A';
+                        }
+                        chartIndex++;
+                    } else if (!found && !initialLoadComplete) {
+                        const chartKey = `${groupDef.name}-${identifier}`;
                         const chartDiv = document.createElement('div');
                         chartDiv.classList.add('chart-container');
                         const canvas = document.createElement('canvas');
                         chartDiv.appendChild(canvas);
-
-                        // Add a div to display the latest value
                         const latestValueDiv = document.createElement('div');
                         latestValueDiv.classList.add('latest-value');
-                        latestValueDiv.textContent = 'Current: N/A'; // Initial text
-                        chartDiv.appendChild(latestValueDiv);
-
+                        latestValueDiv.textContent = 'Current: N/A';
                         groupDiv.appendChild(chartDiv);
-    
                         const ctx = canvas.getContext('2d');
-                        const newChart = new Chart(ctx, {
+                        chartInstances[chartKey] = new Chart(ctx, {
                             type: 'line',
-                            data: {
-                                labels: groupedData[friendlyName][sensorName].map(item => item.x),
-                                datasets: [{
-                                    label: sensorName,
-                                    data: groupedData[friendlyName][sensorName].map(item => item.y),
-                                    borderColor: '#00bfff',
-                                    borderWidth: 1,
-                                    pointRadius: 0,
-                                    tension: 0,
-                                    fill: true,
-                                    backgroundColor: (context) => {
-                                        const chart = context.chart;
-                                        const { ctx, chartArea, scales } = chart;
-
-                                        if (!chartArea || !scales.y) {
-                                            return null;
-                                        }
-
-                                        const gradient = ctx.createLinearGradient(0, scales.y.bottom, 0, scales.y.top);
-                                        gradient.addColorStop(0, 'rgba(0, 191, 255, 0.4)'); // Start color (adjust alpha for transparency)
-                                        gradient.addColorStop(1, 'rgba(0, 191, 255, 1)'); // End color (fully transparent)
-
-                                        return gradient;
-                                    }
-                                }]
-                            },
-                            options: {
-                                responsive: true,
-                                maintainAspectRatio: false,
-                                animation: false,
-                                scales: {
-                                    x: {
-                                        type: 'category',
-                                        display: true
-                                    },
-                                    y: {
-                                        beginAtZero: false,
-                                        title: {
-                                            display: false,
-                                            /* text: sensorName.split('(')[0].trim() */
-                                        }
-                                    }
-                                },
-                                plugins: {
-                                    legend: {
-                                        display: true,
-                                        labels: {
-                                            boxWidth: 0,           // Remove the color box
-                                            font: {
-                                                size: 14,          // Increase the font size
-                                                weight: 'bold'     // Make the text bolder (you can adjust)
-                                            },
-                                            color: '#eee'         // Brighter text color
-                                        }
-                                    }
-                                }
-                            }
+                            data: { labels: [], datasets: [{ label: identifier.split(' ').slice(1).join(' '), data: [], borderColor: '#888', borderWidth: 1, pointRadius: 0, tension: 0, fill: false }] },
+                            options: { responsive: true, maintainAspectRatio: false, animation: false, scales: { x: { type: 'category', display: true }, y: { beginAtZero: false, title: { display: false } } }, plugins: { legend: { display: true, labels: { boxWidth: 0, font: { size: 14, weight: 'bold' }, color: '#eee' } } } }
                         });
-                        chartInstances[`${friendlyName}-${sensorName}`] = newChart;
+                        chartIndex++;
                     }
                 }
-            }
-    
-            function updateCharts(groupedData) {
-                for (const friendlyName in groupedData) { // Use friendlyName to access the group data
-                    for (const sensorName in groupedData[friendlyName]) {
-                        const chartKey = `${friendlyName}-${sensorName}`;
-                        if (chartInstances[chartKey]) {
-                            const dataPoints = groupedData[friendlyName][sensorName];
-                            chartInstances[chartKey].data.labels = groupedData[friendlyName][sensorName].map(item => item.x);
-                            chartInstances[chartKey].data.datasets[0].data = groupedData[friendlyName][sensorName].map(item => item.y);
-                            chartInstances[chartKey].update('none'); // 'none' for immediate update
 
-                            // Update the latest value display
-                            const latestValueDiv = chartInstances[chartKey].canvas.parentNode.querySelector('.latest-value');
-                            if (dataPoints && dataPoints.length > 0) {
-                                const latestValueRaw = parseFloat(dataPoints[dataPoints.length - 1].y);
-                                const latestValueFormatted = (Number.isInteger(latestValueRaw) ? latestValueRaw : latestValueRaw.toFixed(2));
-                                latestValues[chartKey] = latestValueFormatted;
-                                latestValueDiv.textContent = `Current: ${latestValueFormatted}`;
-                            } else {
-                                latestValueDiv.textContent = 'Current: N/A';
-                            }
-                        }
-                    }
+                // Remove any extra chart containers if the number of sensors decreased
+                while (chartIndex < existingChartContainers.length) {
+                    existingChartContainers[chartIndex].remove();
+                    chartIndex++;
                 }
             }
-    
-            async function fetchData() {
-                try {
-                    const response = await fetch('/sensors/all');
-                    if (!response.ok) {
-                        console.error('Failed to fetch sensor data:', response.status);
-                        document.querySelector('.container').innerHTML = '<p class="error">Failed to load sensor data.</p>';
-                        return;
-                    }
-                    const sensorData = await response.json();
+            initialLoadComplete = true;
+        }
 
-                    const groupedData = {};
-                    for (const friendlyName in sensorData) { // Iterate over the friendly names from the JSON
-                        if (!groupedData[friendlyName]) {
-                            groupedData[friendlyName] = {};
-                        }
-                        for (const sensorType in sensorData[friendlyName]) {
-                            const sensorReadings = sensorData[friendlyName][sensorType];
-                            if (sensorReadings && sensorReadings.length > 0) {
-                                const firstReading = sensorReadings[0];
-                                for (const actualSensorName in firstReading.Values) {
-                                    const chartLabel = `${actualSensorName}`;
-                                    if (!groupedData[friendlyName][chartLabel]) {
-                                        groupedData[friendlyName][chartLabel] = [];
-                                    }
-                                    groupedData[friendlyName][chartLabel].push(...sensorReadings.map(item => ({
-                                        x: new Date(item.Timestamp).toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' }),
-                                        y: item.Values[actualSensorName]
-                                    })));
-                                }
-                            }
-                        }
-                    }
-                    const container = document.querySelector('.container');
-                    if (Object.keys(chartInstances).length === 0) {
-                        initializeCharts(container, groupedData);
-                    } else {
-                        updateCharts(groupedData);
-                    }
-                } catch (error) {
-                    console.error('Error fetching or processing data:', error);
-                    document.querySelector('.container').innerHTML = '<p class="error">Failed to load sensor data.</p>';
+        async function fetchData() {
+            try {
+                const response = await fetch('/sensors/all');
+                if (!response.ok) {
+                    const errorText = await response.text();
+                    console.error('Failed to fetch sensor data:', response.status, errorText);
+                    document.querySelector('.container').innerHTML = `<p class="error">Failed to load sensor data. Status: ${response.status} ${errorText}</p>`;
+                    return;
                 }
+                const allSensorData = await response.json();
+
+                if (!initialLoadComplete) {
+                    initializeDashboard(allSensorData);
+                    updateCharts(allSensorData);
+                } else {
+                    updateCharts(allSensorData);
+                }
+            } catch (error) {
+                console.error('Error fetching or processing data:', error);
+                document.querySelector('.container').innerHTML = `<p class="error">Failed to load sensor data. Error: ${error}</p>`;
             }
-    
-            window.addEventListener('load', () => {
-                fetchData();
-                setInterval(fetchData, 1000);
-            });
-        </script>
+        }
+
+        window.addEventListener('load', () => {
+            fetchData();
+            setInterval(fetchData, 1000);
+        });
+    </script>
 </body>
 </html>

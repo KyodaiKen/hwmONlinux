@@ -4,6 +4,7 @@ webServer:
   contentRoot: ./wwwroot
 sensorData:
   dataRetentionSeconds: 120
+
 sensorProviders:
   - type: "HwMonLinux.KKFC01SensorDataProvider, HwmONlinuxServer"
     config:
@@ -12,6 +13,14 @@ sensorProviders:
       baudRate: 115200
       queryCommand: "bs"
       identificationString: "KyoudaiKen FC02"
+    publishedSensors:
+      - "Water Temperature (°C)"
+      - "Case Temperature (°C)"
+      - "Ambient Temperature (°C)"
+      - "Water MV"
+      - "Case MV"
+      - "Radiator Fan Speed (%)"
+      - "Case Fan Speed (%)"
   - type: "HwMonLinux.LmsensorsSensorDataProvider, HwmONlinuxServer"
     config:
       friendlyName: "LMSensors"
@@ -21,6 +30,7 @@ sensorProviders:
         nct6798-isa-0290-fan7: "Pump (RPM)"
         nct6798-isa-0290-PCH_CHIP_TEMP: "PCH (°C)"
         "coretemp-isa-0000-Package id 0": "CPU Package (°C)"
+        acpitz-acpi-0-temp1: "iGPU Temperature (°C)"
   - type: "HwMonLinux.NvidiaSmiSensorDataProvider, HwmONlinuxServer"
     config:
       friendlyName: "NVidia RTX 3090"
@@ -37,18 +47,118 @@ sensorProviders:
         - "clocks.current.sm"
         - "clocks.current.memory"
       sensorNameOverrides:
-        "temperature.gpu": "Core Temperature"
-        "utilization.gpu": "Core Load"
-        "utilization.memory": "Memory Controller Load"
-        "utilization.encoder": "Encoder Load"
-        "utilization.decoder": "Decoder Load"
-        "utilization.ofa": "Optical Flow Accelerator Engine Load"
-        "memory.used": "Memory Used"
-        "power.draw.instant": "Power"
-        "clocks.current.graphics": "Graphics Clock "
-        "clocks.current.sm": "Streaming Multiprocessor Clock"
-        "clocks.current.memory": "Memory Clock"
-  - type: "HwMonLinux.IntelPackagePowerDataProvider, HwmONlinuxServer"
+        "temperature.gpu": "Core Temperature (°C)"
+        "utilization.gpu": "Core Load (%)"
+        "utilization.memory": "Memory Controller Load (%)"
+        "utilization.encoder": "Encoder Load (%)"
+        "utilization.decoder": "Decoder Load (%)"
+        "utilization.ofa": "Optical Flow Accel. Load (%)"
+        "memory.used": "Memory Used (MB)"
+        "power.draw.instant": "Power (W)"
+        "clocks.current.graphics": "Graphics Clock (MHz)"
+        "clocks.current.sm": "Streaming Multiprocessor Clock (MHz)"
+        "clocks.current.memory": "Memory Clock (MHz)"
+  - type: "HwMonLinux.IntelPackagePowerSensorDataProvider, HwmONlinuxServer"
     config:
       friendlyName: "Intel Core i9-13900KS"
       energyFilePath: "/sys/class/powercap/intel-rapl/intel-rapl:0/energy_uj"
+  - type: "HwMonLinux.CpuUtilizationSensorDataProvider, HwmONlinuxServer"
+    config:
+      friendlyName: "CPU Util"
+    publishedSensors:
+      - "Overall Utilization (%)"
+  - type: "HwMonLinux.MemoryUtilizationSensorDataProvider, HwmONlinuxServer"
+    config:
+      friendlyName: "System Memory"
+    publishedSensors:
+      - "Memory Used (GB)"
+      - "Swap Used (GB)"
+  - type: "HwMonLinux.IntelGpuSensorDataProvider, HwmONlinuxServer"
+    config:
+      friendlyName: "Intel iGPU"
+    publishedSensors:
+      - "GPU Render/3D Utilization (%)"
+      - "GPU Blitter Utilization (%)"
+      - "GPU Video Utilization (%)"
+      - "GPU VideoEnhance Utilization (%)"
+      - "GPU Frequency (MHz)"
+      - "GPU Power (W)"
+  - type: "HwMonLinux.NetworkIoSensorDataProvider, HwmONlinuxServer"
+    config:
+      friendlyName: "Network I/O"
+    publishedSensors:
+      - "eno1 Rx (MBit/s)"
+      - "eno1 Tx (MBit/s)"
+      - "enp65s0 Rx (MBit/s)"
+      - "enp65s0 Tx (MBit/s)"
+  - type: "HwMonLinux.DiskIoSensorDataProvider, HwmONlinuxServer"
+    config:
+      friendlyName: "Disk I/O"
+    publishedSensors:
+      - "nvme0n1 Read (MB/s)"
+      - "nvme0n1 Write (MB/s)"
+      - "nvme1n1 Read (MB/s)"
+      - "nvme1n1 Write (MB/s)"
+      - "nvme2n1 Read (MB/s)"
+      - "nvme2n1 Write (MB/s)"
+      - "nvme3n1 Read (MB/s)"
+      - "nvme3n1 Write (MB/s)"
+
+sensorGroups:
+  - name: "system_temps"
+    friendlyName: "System Temperatures & Fans"
+    sensorIdentifiers:
+      - "Fan Controller FC02 Water Temperature (°C)"
+      - "Fan Controller FC02 Case Temperature (°C)"
+      - "Fan Controller FC02 Ambient Temperature (°C)"
+      - "LMSensors PCH (°C)"
+      - "LMSensors Rad (RPM)"
+      - "LMSensors Pump (RPM)"
+  - name: "cpu"
+    friendlyName: "Intel Core i9-13900KS CPU"
+    sensorIdentifiers:
+      - "CPU Util Overall Utilization (%)"
+      - "Intel Core i9-13900KS Package Power (W)"
+      - "LMSensors CPU Package (°C)"
+      - "System Memory Memory Used (GB)"
+      - "System Memory Swap Used (GB)"
+  - name: "igpu"
+    friendlyName: "Intel Core i9-13900KS iGPU"
+    sensorIdentifiers:
+      - "Intel iGPU GPU Render/3D Utilization (%)"
+      - "Intel iGPU GPU Blitter Utilization (%)"
+      - "Intel iGPU GPU Video Utilization (%)"
+      - "Intel iGPU GPU VideoEnhance Utilization (%)"
+      - "Intel iGPU GPU Frequency (MHz)"
+      - "Intel iGPU GPU Power (W)"
+  - name: "gpu"
+    friendlyName: "NVidia RTX 3090"
+    sensorIdentifiers:
+      - "NVidia RTX 3090 Core Temperature (°C)"
+      - "NVidia RTX 3090 Core Load (%)"
+      - "NVidia RTX 3090 Memory Controller Load (%)"
+      - "NVidia RTX 3090 Encoder Load (%)"
+      - "NVidia RTX 3090 Decoder Load (%)"
+      - "NVidia RTX 3090 Optical Flow Accel. Load (%)"
+      - "NVidia RTX 3090 Memory Used (MB)"
+      - "NVidia RTX 3090 Power (W)"
+      - "NVidia RTX 3090 Graphics Clock (MHz)"
+      - "NVidia RTX 3090 Memory Clock (MHz)"
+  - name: "net"
+    friendlyName: "Network I/O"
+    sensorIdentifiers:
+      - "Network I/O eno1 Rx (MBit/s)"
+      - "Network I/O eno1 Tx (MBit/s)"
+      - "Network I/O enp65s0 Rx (MBit/s)"
+      - "Network I/O enp65s0 Tx (MBit/s)"
+  - name: "disk"
+    friendlyName: "Disk I/O"
+    sensorIdentifiers:
+      - "Disk I/O nvme1n1 Read (MB/s)"
+      - "Disk I/O nvme1n1 Write (MB/s)"
+      - "Disk I/O nvme2n1 Read (MB/s)"
+      - "Disk I/O nvme2n1 Write (MB/s)"
+      - "Disk I/O nvme0n1 Read (MB/s)"
+      - "Disk I/O nvme0n1 Write (MB/s)"
+      - "Disk I/O nvme3n1 Read (MB/s)"
+      - "Disk I/O nvme3n1 Write (MB/s)"

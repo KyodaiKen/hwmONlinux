@@ -6,8 +6,10 @@ using System.Linq;
 using System.Net;
 using System.Text;
 using System.Text.Json;
+using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
+using System.Collections.Specialized; // Add this using statement
 
 namespace HwMonLinux
 {
@@ -17,14 +19,18 @@ namespace HwMonLinux
         private readonly string _contentRoot;
         private readonly InMemorySensorDataStore _sensorDataStore;
         private readonly List<ISensorDataProvider> _sensorDataProviders;
+        private readonly Dictionary<string, OrderedDictionary> _groupedSensorData = new Dictionary<string, OrderedDictionary>(); // Use OrderedDictionary
+        private readonly List<SensorGroupDefinition> _sensorGroups;
         private CancellationTokenSource _cts;
 
-        public WebServer(string host, int port, string contentRoot, InMemorySensorDataStore sensorDataStore, List<ISensorDataProvider> sensorDataProviders)
+        public WebServer(string host, int port, string contentRoot, InMemorySensorDataStore sensorDataStore, List<ISensorDataProvider> sensorDataProviders, Dictionary<string, OrderedDictionary> groupedSensorData, List<SensorGroupDefinition> sensorGroups)
         {
             _listener.Prefixes.Add($"http://{host}:{port}/");
             _contentRoot = contentRoot;
             _sensorDataStore = sensorDataStore;
             _sensorDataProviders = sensorDataProviders;
+            _groupedSensorData = groupedSensorData;
+            _sensorGroups = sensorGroups;
         }
 
         public async Task StartAsync()
@@ -52,11 +58,11 @@ namespace HwMonLinux
                 try
                 {
                     var context = await _listener.GetContextAsync();
-                    _ = Task.Run(() => ProcessRequestAsync(context)); // Handle jede Anfrage in einem eigenen Task
+                    _ = Task.Run(() => ProcessRequestAsync(context)); // Handle each request in its own Task
                 }
                 catch (HttpListenerException ex) when (ex.ErrorCode == 995)
                 {
-                    // Operation aborted (Listener wurde gestoppt)
+                    // Operation aborted (Listener was stopped)
                     break;
                 }
                 catch (Exception ex)
@@ -78,6 +84,10 @@ namespace HwMonLinux
                 if (request.Url.AbsolutePath == "/sensors/all")
                 {
                     await HandleAllSensorsDataRequestAsync(context);
+                }
+                else if (request.Url.AbsolutePath.StartsWith("/sensors/group/"))
+                {
+                    await HandleGroupSensorsDataRequestAsync(context);
                 }
                 else if (request.Url.AbsolutePath.StartsWith("/sensors/"))
                 {
@@ -130,13 +140,13 @@ namespace HwMonLinux
             var request = context.Request;
             var response = context.Response;
             string sensorName = request.Url.AbsolutePath.Substring("/sensors/".Length);
-            var sensorData = _sensorDataStore.GetLatest(sensorName);
+            var allData = _sensorDataStore.GetAll(sensorName); // Use the raw sensor identifier (provider.Name)
 
             response.ContentType = "application/json";
-            if (sensorData != null)
+            if (allData != null && allData.Any())
             {
                 response.StatusCode = (int)HttpStatusCode.OK;
-                string json = JsonSerializer.Serialize(sensorData);
+                string json = JsonSerializer.Serialize(allData.SelectMany(sd => sd.Values.Select(kvp => new { Timestamp = sd.Timestamp, Name = kvp.Key, Value = kvp.Value })).ToList());
                 byte[] buffer = Encoding.UTF8.GetBytes(json);
                 response.ContentLength64 = buffer.Length;
                 await response.OutputStream.WriteAsync(buffer, 0, buffer.Length);
@@ -144,7 +154,7 @@ namespace HwMonLinux
             else
             {
                 response.StatusCode = (int)HttpStatusCode.NotFound;
-                string notFoundJson = JsonSerializer.Serialize(new { message = $"Sensor '{sensorName}' data not found or expired." });
+                string notFoundJson = JsonSerializer.Serialize(new { message = $"Sensor data for '{sensorName}' not found or expired." });
                 byte[] buffer = Encoding.UTF8.GetBytes(notFoundJson);
                 response.ContentLength64 = buffer.Length;
                 await response.OutputStream.WriteAsync(buffer, 0, buffer.Length);
@@ -162,7 +172,7 @@ namespace HwMonLinux
             foreach (var provider in _sensorDataProviders)
             {
                 var sensorDataForProvider = new Dictionary<string, List<object>>();
-                var allData = _sensorDataStore.GetAll(provider.Name); // Still using provider.Name to fetch data
+                var allData = _sensorDataStore.GetAll(provider.Name);
 
                 if (allData != null && allData.Any())
                 {
@@ -183,24 +193,62 @@ namespace HwMonLinux
                                 sensorDataForProvider[sensorName].Add(new
                                 {
                                     Timestamp = sensorReading.Timestamp,
-                                    Values = new Dictionary<string, object> { { sensorName, value } }
+                                    Value = value
                                 });
                             }
                         }
                     }
-                    allSensorData[provider.FriendlyName] = sensorDataForProvider; // Use FriendlyName as the key in the JSON
+                    allSensorData[provider.FriendlyName] = sensorDataForProvider;
                 }
                 else
                 {
-                    allSensorData[provider.FriendlyName] = new Dictionary<string, List<object>>(); // Use FriendlyName even for empty data
+                    allSensorData[provider.FriendlyName] = new Dictionary<string, List<object>>();
                 }
             }
 
-            string json = JsonSerializer.Serialize(allSensorData);
+            // Embed sensor group information in the JSON response
+            var responseData = new
+            {
+                sensorGroups = _sensorGroups.Select(g => new
+                {
+                    name = g.Name,
+                    friendlyName = g.FriendlyName,
+                    sensorIdentifiers = g.SensorIdentifiers // Ensure this is included!
+                }),
+                providers = allSensorData
+            };
+
+            string json = JsonSerializer.Serialize(responseData);
             byte[] buffer = Encoding.UTF8.GetBytes(json);
             response.ContentLength64 = buffer.Length;
             await response.OutputStream.WriteAsync(buffer, 0, buffer.Length);
         }
+
+        private async Task HandleGroupSensorsDataRequestAsync(HttpListenerContext context)
+        {
+            var request = context.Request;
+            var response = context.Response;
+            string groupName = request.Url.AbsolutePath.Substring("/sensors/group/".Length);
+
+            response.ContentType = "application/json";
+            if (_groupedSensorData.TryGetValue(groupName, out var groupData))
+            {
+                response.StatusCode = (int)HttpStatusCode.OK;
+                string json = JsonSerializer.Serialize(groupData);
+                byte[] buffer = Encoding.UTF8.GetBytes(json);
+                response.ContentLength64 = buffer.Length;
+                await response.OutputStream.WriteAsync(buffer, 0, buffer.Length);
+            }
+            else
+            {
+                response.StatusCode = (int)HttpStatusCode.NotFound;
+                string notFoundJson = JsonSerializer.Serialize(new { message = $"Sensor group '{groupName}' not found." });
+                byte[] buffer = Encoding.UTF8.GetBytes(notFoundJson);
+                response.ContentLength64 = buffer.Length;
+                await response.OutputStream.WriteAsync(buffer, 0, buffer.Length);
+            }
+        }
+
 
         private string GetContentType(string filename)
         {
@@ -224,6 +272,8 @@ namespace HwMonLinux
             while (!cancellationToken.IsCancellationRequested)
             {
                 Stopwatch sw = Stopwatch.StartNew();
+                var latestSensorData = new Dictionary<string, Dictionary<string, object>>(); // Store latest data by provider
+
                 foreach (var provider in _sensorDataProviders)
                 {
                     try
@@ -231,7 +281,8 @@ namespace HwMonLinux
                         var data = provider.GetSensorData();
                         if (data != null)
                         {
-                            _sensorDataStore.Store(provider.Name, data); // Still store by the unique Name
+                            _sensorDataStore.Store(provider.Name, data);
+                            latestSensorData[provider.Name] = data.Values;
                             Console.WriteLine($"[{DateTime.Now}] Sensor '{provider.Name}': Gathered data.");
                         }
                     }
@@ -240,6 +291,38 @@ namespace HwMonLinux
                         Console.WriteLine($"Error polling sensor '{provider.Name}': {ex.Message}");
                     }
                 }
+
+                // Group the latest sensor data, strictly maintaining the order from SensorIdentifiers
+                foreach (var groupDef in _sensorGroups)
+                {
+                    if (!_groupedSensorData.ContainsKey(groupDef.Name))
+                    {
+                        _groupedSensorData[groupDef.Name] = new OrderedDictionary(); // Initialize as OrderedDictionary
+                    }
+                    _groupedSensorData[groupDef.Name].Clear(); // Clear previous data for the group
+
+                    foreach (var identifier in groupDef.SensorIdentifiers)
+                    {
+                        foreach (var providerName in latestSensorData.Keys)
+                        {
+                            var providerLatestData = latestSensorData[providerName];
+                            foreach (var sensorName in providerLatestData.Keys)
+                            {
+                                string fullIdentifier = $"{providerName} {sensorName}";
+                                if (Regex.IsMatch(fullIdentifier, identifier, RegexOptions.IgnoreCase))
+                                {
+                                    if (!_groupedSensorData[groupDef.Name].Contains(fullIdentifier))
+                                    {
+                                        _groupedSensorData[groupDef.Name][fullIdentifier] = providerLatestData[sensorName];
+                                        goto NextIdentifier; // Move to the next identifier after finding a match
+                                    }
+                                }
+                            }
+                        }
+                        NextIdentifier:; // Label to jump to
+                    }
+                }
+
                 sw.Stop();
                 double pollingTimeMs = sw.ElapsedMilliseconds;
                 double delayTimeMs = TimeSpan.FromSeconds(1).TotalMilliseconds;
@@ -252,7 +335,6 @@ namespace HwMonLinux
                 else
                 {
                     Console.WriteLine($"[{DateTime.Now}] Warning: Polling took longer than the desired interval ({(pollingTimeMs / 1000.0):F3}s >= 1s).");
-                    // Optionally add a small delay to avoid spinning the CPU too much
                     await Task.Delay(1, cancellationToken);
                 }
             }

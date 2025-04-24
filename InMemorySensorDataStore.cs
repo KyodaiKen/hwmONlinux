@@ -2,71 +2,55 @@ using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
-using System.Threading.Tasks;
 
 namespace HwMonLinux
 {
     public class InMemorySensorDataStore
     {
-        private readonly ConcurrentDictionary<string, ConcurrentQueue<(SensorData Data, DateTime Timestamp)>> _sensorDataHistory = new ConcurrentDictionary<string, ConcurrentQueue<(SensorData, DateTime)>>();
-        private readonly int _dataRetentionSeconds;
+        private readonly int _retentionSeconds;
+        private readonly ConcurrentDictionary<string, ConcurrentQueue<SensorData>> _sensorData = new ConcurrentDictionary<string, ConcurrentQueue<SensorData>>();
 
-        public InMemorySensorDataStore(int dataRetentionSeconds)
+        public InMemorySensorDataStore(int retentionSeconds)
         {
-            _dataRetentionSeconds = dataRetentionSeconds;
-            Task.Run(async () => await CleanupExpiredDataAsync());
+            _retentionSeconds = retentionSeconds;
         }
 
-        public void Store(string sensorName, SensorData data)
+        public void Store(string sensorIdentifier, SensorData data)
         {
-            var newDataPoint = (data, DateTime.UtcNow);
-            _sensorDataHistory.AddOrUpdate(
-                sensorName,
-                (key) => { // Factory function to create a new ConcurrentQueue
-                    var queue = new ConcurrentQueue<(SensorData, DateTime)>();
-                    queue.Enqueue(newDataPoint);
-                    return queue;
-                },
-                (key, existingQueue) => { existingQueue.Enqueue(newDataPoint); return existingQueue; });
-        }
-
-        public SensorData? GetLatest(string sensorName)
-        {
-            if (_sensorDataHistory.TryGetValue(sensorName, out var dataQueue))
+            if (!_sensorData.ContainsKey(sensorIdentifier))
             {
-                var latest = dataQueue.LastOrDefault(item => (DateTime.UtcNow - item.Timestamp).TotalSeconds <= _dataRetentionSeconds);
-                return latest.Data;
+                _sensorData.TryAdd(sensorIdentifier, new ConcurrentQueue<SensorData>());
+            }
+            _sensorData[sensorIdentifier].Enqueue(data);
+            CleanupOldData(sensorIdentifier);
+        }
+
+        public SensorData GetLatest(string sensorIdentifier)
+        {
+            if (_sensorData.TryGetValue(sensorIdentifier, out var queue) && queue.LastOrDefault() != null)
+            {
+                return queue.LastOrDefault();
             }
             return null;
         }
 
-        public List<SensorData> GetAll(string sensorName)
+        public IEnumerable<SensorData> GetAll(string sensorIdentifier)
         {
-            if (_sensorDataHistory.TryGetValue(sensorName, out var dataQueue))
+            if (_sensorData.TryGetValue(sensorIdentifier, out var queue))
             {
-                var currentTime = DateTime.UtcNow;
-                return dataQueue
-                    .Where(item => (currentTime - item.Timestamp).TotalSeconds <= _dataRetentionSeconds)
-                    .Select(item => item.Data)
-                    .ToList();
+                return queue.ToList();
             }
-            return new List<SensorData>();
+            return Enumerable.Empty<SensorData>();
         }
 
-        private async Task CleanupExpiredDataAsync()
+        private void CleanupOldData(string sensorIdentifier)
         {
-            while (true)
+            if (_sensorData.TryGetValue(sensorIdentifier, out var queue))
             {
-                await Task.Delay(TimeSpan.FromSeconds(Math.Min(10, _dataRetentionSeconds)));
-                var currentTime = DateTime.UtcNow;
-                foreach (var sensorName in _sensorDataHistory.Keys.ToList())
+                DateTime cutoff = DateTime.UtcNow.AddSeconds(-_retentionSeconds);
+                while (queue.TryPeek(out var oldest) && oldest.Timestamp < cutoff)
                 {
-                    if (_sensorDataHistory.TryGetValue(sensorName, out var dataQueue))
-                    {
-                        var nonExpiredData = new ConcurrentQueue<(SensorData Data, DateTime Timestamp)>(
-                            dataQueue.Where(item => (currentTime - item.Timestamp).TotalSeconds <= _dataRetentionSeconds));
-                        _sensorDataHistory.TryUpdate(sensorName, nonExpiredData, dataQueue);
-                    }
+                    queue.TryDequeue(out _);
                 }
             }
         }

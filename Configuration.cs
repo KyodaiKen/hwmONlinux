@@ -1,54 +1,57 @@
 using System.Collections.Generic;
+using System.IO;
 using YamlDotNet.Serialization;
 using YamlDotNet.Serialization.NamingConventions;
 
 namespace HwMonLinux
 {
+    public class SensorProviderDefinition
+    {
+        public string Type { get; set; }
+        public Dictionary<object, object> Config { get; set; }
+        public List<string> PublishedSensors { get; set; } // Optional: List of specific sensors to publish
+    }
+
+    public class SensorGroupDefinition
+    {
+        public string Name { get; set; }
+        public string FriendlyName { get; set; }
+        public List<string> SensorIdentifiers { get; set; } // Identifiers to match sensors from providers
+    }
+
+    public class WebServerConfig
+    {
+        public string Host { get; set; }
+        public int Port { get; set; }
+        public string ContentRoot { get; set; }
+    }
+
+    public class SensorDataConfig
+    {
+        public int DataRetentionSeconds { get; set; }
+    }
+
     public class Configuration
     {
-        public WebServerSettings WebServer { get; set; } = new WebServerSettings();
-        public SensorDataSettings SensorData { get; set; } = new SensorDataSettings();
-        public List<ProviderDefinition> SensorProviders { get; set; } = new List<ProviderDefinition>();
+        public WebServerConfig WebServer { get; set; }
+        public SensorDataConfig SensorData { get; set; }
+        public List<SensorProviderDefinition> SensorProviders { get; set; }
+        public List<SensorGroupDefinition> SensorGroups { get; set; } // New property for sensor groups
 
-        public class WebServerSettings
+        public static Configuration Load(string path)
         {
-            public string Host { get; set; } = "0.0.0.0";
-            public int Port { get; set; } = 8080;
-            public string ContentRoot { get; set; } = "wwwroot"; // Directory for static files
-        }
-
-        public class SensorDataSettings
-        {
-            public int DataRetentionSeconds { get; set; } = 120;
-        }
-
-        public class ProviderDefinition
-        {
-            public string Type { get; set; }
-            public Dictionary<string, object> Config { get; set; } = new Dictionary<string, object>();
-        }
-
-        public static Configuration Load(string configPath)
-        {
-            if (!File.Exists(configPath))
+            if (!File.Exists(path))
             {
-                Console.WriteLine($"Cannot find configuration file: {configPath}. Using defaults.");
-                return new Configuration();
+                throw new FileNotFoundException($"Configuration file not found at: {path}");
             }
 
             var deserializer = new DeserializerBuilder()
                 .WithNamingConvention(CamelCaseNamingConvention.Instance)
                 .Build();
 
-            try
+            using (var reader = new StreamReader(path))
             {
-                var yaml = File.ReadAllText(configPath);
-                return deserializer.Deserialize<Configuration>(yaml);
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine($"Error while reading the configuration file: {ex.Message}. Using defaults.");
-                return new Configuration();
+                return deserializer.Deserialize<Configuration>(reader);
             }
         }
     }
