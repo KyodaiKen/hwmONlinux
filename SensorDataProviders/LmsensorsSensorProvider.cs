@@ -54,7 +54,14 @@ namespace HwMonLinux
                         {
                             line = line.Trim();
 
-                            // Identify chip names (e.g., "acpitz-acpi-0")
+                            // Identify spd memory chip names (e.g., "spd5118-i2c-14-53")
+                            if (Regex.IsMatch(line, @"^spd\d+-[a-zA-Z0-9]+-\d+-\d+$"))
+                            {
+                                currentChip = line;
+                                continue;
+                            }
+
+                            // Identify other chip names (e.g., "acpitz-acpi-0")
                             if (Regex.IsMatch(line, @"^[a-zA-Z0-9]+-[a-zA-Z0-9]+-\d+$"))
                             {
                                 currentChip = line;
@@ -70,6 +77,7 @@ namespace HwMonLinux
                                 string fullSensorNameRaw = currentChip != null ? $"{currentChip}-{sensorNameRaw}" : sensorNameRaw;
                                 string finalSensorName = fullSensorNameRaw;
 
+                                //Console.WriteLine(fullSensorNameRaw);
                                 // Apply filter if one is provided
                                 if (_filterRegex != null && !Regex.IsMatch(fullSensorNameRaw, _filterRegex))
                                 {
