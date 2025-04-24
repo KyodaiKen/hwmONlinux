@@ -1,4 +1,4 @@
-# HwMonLinux - Hardware Monitoring for Linux
+# HwmONLinux - Hardware Monitoring for Linux
 
 ## Overview
 
