@@ -12,14 +12,16 @@ namespace HwMonLinux
     {
         public string Name => "DiskIO";
         public string FriendlyName { get; }
+        private readonly Dictionary<string, string> _sensorNameOverrides;
 
         private Dictionary<string, (long ReadBytes, long WriteBytes, DateTime Timestamp)> _previousStats = new Dictionary<string, (long, long, DateTime)>();
         private List<string> _mountPoints = new List<string>();
         private bool _disposed = false;
 
-        public DiskIoSensorDataProvider(string friendlyName)
+        public DiskIoSensorDataProvider(string friendlyName, Dictionary<string, string> sensorNameOverrides = null)
         {
             FriendlyName = friendlyName;
+            _sensorNameOverrides = sensorNameOverrides ?? new Dictionary<string, string>();
             _mountPoints = GetMonitoredMountPoints();
         }
 
@@ -58,6 +60,12 @@ namespace HwMonLinux
             {
                 if (currentStats.TryGetValue(mountPoint, out var current))
                 {
+                    // Apply sensor name overrides
+                    string finalSensorName = mountPoint.Split('/')[2];
+                    if (_sensorNameOverrides.ContainsKey(finalSensorName))
+                    {
+                        finalSensorName = _sensorNameOverrides[finalSensorName];
+                    }
                     if (_previousStats.TryGetValue(mountPoint, out var previous))
                     {
                         var timeDiff = now - previous.Timestamp;
@@ -69,8 +77,8 @@ namespace HwMonLinux
                             var readMBps = (double)readDiffBytes / timeDiff.TotalSeconds / (1024 * 1024);
                             var writeMBps = (double)writeDiffBytes / timeDiff.TotalSeconds / (1024 * 1024);
 
-                            sensorValues[$"{mountPoint.Split('/')[2]} Read (MB/s)"] = Math.Round(readMBps, 3);
-                            sensorValues[$"{mountPoint.Split('/')[2]} Write (MB/s)"] = Math.Round(writeMBps, 3);
+                            sensorValues[$"{finalSensorName} Read (MB/s)"] = Math.Round(readMBps, 3);
+                            sensorValues[$"{finalSensorName} Write (MB/s)"] = Math.Round(writeMBps, 3);
                         }
                     }
                     _previousStats[mountPoint] = (current.ReadBytes, current.WriteBytes, now);

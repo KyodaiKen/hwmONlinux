@@ -60,8 +60,9 @@ namespace HwMonLinux
 
             if (type != null && typeof(ISensorDataProvider).IsAssignableFrom(type))
             {
-                var constructor = type.GetConstructors().OrderByDescending(c => c.GetParameters().Length).FirstOrDefault();
-                if (constructor != null)
+                var constructors = type.GetConstructors().OrderByDescending(c => c.GetParameters().Length);
+
+                foreach (var constructor in constructors)
                 {
                     var parameters = constructor.GetParameters();
                     var constructorArgs = new List<object>();
@@ -88,37 +89,47 @@ namespace HwMonLinux
                             }
                             catch (Exception ex)
                             {
-                                Console.WriteLine($"Warning: Could not convert config value '{configValue}' for parameter '{paramInfo.Name}' of '{typeName}'. Skipping provider.");
+                                Console.WriteLine($"Warning: Could not convert config value '{configValue}' for parameter '{paramInfo.Name}' of '{typeName}'. Trying next constructor.");
                                 canCreate = false;
                                 break;
                             }
                         }
+                        else if (!paramInfo.IsOptional)
+                        {
+                            Console.WriteLine($"Warning: Configuration key '{paramInfo.Name}' not found for non-optional parameter of provider '{typeName}'. Trying next constructor.");
+                            canCreate = false;
+                            break;
+                        }
                         else
                         {
-                            Console.WriteLine($"Warning: Configuration key '{paramInfo.Name}' not found for provider '{typeName}'. Skipping provider.");
-                                canCreate = false;
-                                break;
+                            constructorArgs.Add(Type.Missing); // Use default value for optional parameter
                         }
                     }
 
                     if (canCreate)
                     {
-                        var instance = Activator.CreateInstance(type, constructorArgs.ToArray()) as ISensorDataProvider;
-                        if (instance != null)
+                        try
                         {
-                            Console.WriteLine($"Loaded sensor provider: {instance.FriendlyName} ({instance.Name})");
-                            return instance;
+                            var instance = Activator.CreateInstance(type, constructorArgs.ToArray()) as ISensorDataProvider;
+                            if (instance != null)
+                            {
+                                Console.WriteLine($"Loaded sensor provider: {instance.FriendlyName} ({instance.Name})");
+                                return instance;
+                            }
+                            else
+                            {
+                                Console.WriteLine($"Error: Could not create instance of provider '{typeName}' using constructor: {constructor}.");
+                            }
                         }
-                        else
+                        catch (Exception ex)
                         {
-                            Console.WriteLine($"Error: Could not create instance of provider '{typeName}'.");
+                            Console.WriteLine($"Error creating instance of provider '{typeName}' using constructor: {constructor}. Exception: {ex.Message}");
                         }
+                        // If instance creation fails, we continue to the next constructor
                     }
                 }
-                else
-                {
-                    Console.WriteLine($"Error: No suitable constructor found for provider '{typeName}'.");
-                }
+
+                Console.WriteLine($"Error: No suitable constructor found for provider '{typeName}' that could be satisfied with the provided configuration.");
             }
             else
             {

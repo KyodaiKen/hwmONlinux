@@ -12,14 +12,16 @@ namespace HwMonLinux
     {
         public string Name => "NetworkIO";
         public string FriendlyName { get; }
+        private readonly Dictionary<string, string> _sensorNameOverrides;
 
         private Dictionary<string, (long ReceivedBytes, long TransmittedBytes, DateTime Timestamp)> _previousStats = new Dictionary<string, (long, long, DateTime)>();
         private List<string> _networkInterfaces = new List<string>();
         private bool _disposed = false;
 
-        public NetworkIoSensorDataProvider(string friendlyName)
+        public NetworkIoSensorDataProvider(string friendlyName,  Dictionary<string, string> sensorNameOverrides = null)
         {
             FriendlyName = friendlyName;
+            _sensorNameOverrides = sensorNameOverrides ?? new Dictionary<string, string>();
             _networkInterfaces = GetActiveEthernetInterfaces();
         }
 
@@ -55,7 +57,12 @@ namespace HwMonLinux
             {
                 if (currentStats.TryGetValue(iface, out var current))
                 {
-
+                    // Apply sensor name overrides
+                    string finalSensorName = iface;
+                    if (_sensorNameOverrides.ContainsKey(iface))
+                    {
+                        finalSensorName = _sensorNameOverrides[iface];
+                    }
                     if (_previousStats.TryGetValue(iface, out var previous))
                     {
                         var timeDiff = now - previous.Timestamp;
@@ -67,8 +74,8 @@ namespace HwMonLinux
                             var receivedMbps = (double)receivedDiffBytes * 8 / timeDiff.TotalSeconds / (1000 * 1000); // Bytes to Bits, then to MBit/s
                             var transmittedMbps = (double)transmittedDiffBytes * 8 / timeDiff.TotalSeconds / (1000 * 1000); // Bytes to Bits, then to MBit/s
 
-                            sensorValues[$"{iface} Rx (MBit/s)"] = Math.Round(receivedMbps, 3);
-                            sensorValues[$"{iface} Tx (MBit/s)"] = Math.Round(transmittedMbps, 3);
+                            sensorValues[$"{finalSensorName} Rx (MBit/s)"] = Math.Round(receivedMbps, 3);
+                            sensorValues[$"{finalSensorName} Tx (MBit/s)"] = Math.Round(transmittedMbps, 3);
                         }
                     }
                     _previousStats[iface] = (current.ReceivedBytes, current.TransmittedBytes, now);
