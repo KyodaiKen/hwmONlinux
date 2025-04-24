@@ -18,7 +18,7 @@ HwMonLinux is a lightweight and extensible web-based hardware monitoring tool de
 
 * **.NET Runtime:** This tool may require .NET runtime 8 or later preinstalled on your Linux system, depending on if you choose to use the standalone release or the version packaged with the runtime. Releases may come later. You can find instructions how to install the runtime in your Linux distribution here: [Microsoft Learn](https://learn.microsoft.com/en-us/dotnet/core/install/linux).
 * **`lm-sensors` (Optional but Recommended):** For comprehensive hardware sensor detection, it's recommended to have `lm-sensors` installed. You can usually install it using your distribution's package manager (e.g., `sudo apt install lm-sensors` on Debian/Ubuntu, `sudo dnf install lm_sensors` on Fedora/CentOS). Run `sudo sensors-detect` after installation to configure sensor drivers.
-* **`intel-gpu-tools` (Optional):** For more detailed Intel GPU monitoring, you might want to install `intel-gpu-tools` (`sudo apt install intel-gpu-tools`).
+* **`intel-gpu-tools` (Optional):** For more detailed Intel GPU monitoring, you might want to install `intel-gpu-tools` (`sudo apt install intel-gpu-tools`). **Requires root privileges**
 * **`nvidia-smi`** For NVidia GPUs only. It usually comes with the official NVidia GPU driver for Linux.
 
 #### Building and installing from GIT
