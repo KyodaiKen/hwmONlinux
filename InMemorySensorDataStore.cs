@@ -25,7 +25,7 @@ namespace HwMonLinux
             CleanupOldData(sensorIdentifier);
         }
 
-        public SensorData GetLatest(string sensorIdentifier)
+        public SensorData? GetLatest(string sensorIdentifier)
         {
             if (_sensorData.TryGetValue(sensorIdentifier, out var queue) && queue.LastOrDefault() != null)
             {
