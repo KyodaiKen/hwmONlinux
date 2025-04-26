@@ -8,8 +8,9 @@ namespace HwMonLinux
     public class InMemorySensorDataStore
     {
         private readonly int _retentionSeconds;
-        private readonly ConcurrentDictionary<string, ConcurrentQueue<SensorData>> _sensorDataQueues = new ConcurrentDictionary<string, ConcurrentQueue<SensorData>>();
-        private readonly ConcurrentBag<SensorData> _sensorDataPool = new ConcurrentBag<SensorData>();
+        private readonly ConcurrentDictionary<string, ConcurrentQueue<ReusableSensorData>> _sensorDataQueues = new ConcurrentDictionary<string, ConcurrentQueue<ReusableSensorData>>();
+        private readonly ConcurrentBag<ReusableSensorData> _sensorDataPool = new ConcurrentBag<ReusableSensorData>();
+
         private readonly ConcurrentBag<Dictionary<string, object>> _valueDictionaryPool = new ConcurrentBag<Dictionary<string, object>>();
 
         public InMemorySensorDataStore(int retentionSeconds)
@@ -19,12 +20,12 @@ namespace HwMonLinux
 
         public void Store(string sensorIdentifier, SensorData data)
         {
-            if (!_sensorDataQueues.ContainsKey(sensorIdentifier))
+            if (!_sensorDataQueues.TryGetValue(sensorIdentifier, out var queue))
             {
-                _sensorDataQueues.TryAdd(sensorIdentifier, new ConcurrentQueue<SensorData>());
+                _sensorDataQueues.TryAdd(sensorIdentifier, new ConcurrentQueue<ReusableSensorData>());
             }
 
-            SensorData sensorData = _sensorDataPool.TryTake(out var pooledSensorData) ? pooledSensorData : new SensorData();
+            ReusableSensorData reusableData = _sensorDataPool.TryTake(out var pooledData) ? pooledData : new ReusableSensorData();
             Dictionary<string, object> values = _valueDictionaryPool.TryTake(out var pooledDictionary) ? pooledDictionary : new Dictionary<string, object>();
 
             values.Clear();
@@ -33,10 +34,10 @@ namespace HwMonLinux
                 values[kvp.Key] = kvp.Value;
             }
 
-            sensorData.Timestamp = data.Timestamp;
-            sensorData.Values = values;
+            reusableData.Timestamp = data.Timestamp;
+            reusableData.Values = values;
 
-            _sensorDataQueues[sensorIdentifier].Enqueue(sensorData);
+            _sensorDataQueues[sensorIdentifier].Enqueue(reusableData);
             CleanupOldData(sensorIdentifier);
         }
 
@@ -53,7 +54,8 @@ namespace HwMonLinux
         {
             if (_sensorDataQueues.TryGetValue(sensorIdentifier, out var queue))
             {
-                return queue.ToList();
+                // Return a view over the queue's elements without creating a new list immediately
+                return queue;
             }
             return Enumerable.Empty<SensorData>();
         }
@@ -63,11 +65,23 @@ namespace HwMonLinux
             if (_sensorDataQueues.TryGetValue(sensorIdentifier, out var queue))
             {
                 DateTime cutoff = DateTime.UtcNow.AddSeconds(-_retentionSeconds);
-                while (queue.TryPeek(out var oldest) && oldest.Timestamp < cutoff)
+                ReusableSensorData oldest;
+                while (queue.TryPeek(out oldest) && oldest.Timestamp < cutoff)
                 {
-                    queue.TryDequeue(out _);
+                    if (queue.TryDequeue(out var toReturn))
+                    {
+                        // Prepare the dequeued object for potential reuse
+                        toReturn.Values = null; // Clear reference for safety
+                        _sensorDataPool.Add(toReturn);
+                    }
                 }
             }
+        }
+
+        // Dedicated reusable class to minimize allocations
+        private class ReusableSensorData : SensorData
+        {
+            // Inherits Timestamp and Values
         }
     }
 }

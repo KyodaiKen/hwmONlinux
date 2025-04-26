@@ -199,7 +199,7 @@ namespace HwMonLinux
         {
             lock (_currentSensorData)
             {
-                return new SensorData { Values = new Dictionary<string, object>(_currentSensorData.Values) };
+                return _currentSensorData;
             }
         }
 
