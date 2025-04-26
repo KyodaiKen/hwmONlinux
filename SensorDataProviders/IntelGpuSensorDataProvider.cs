@@ -5,7 +5,6 @@ using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Text;
-using System.Text.Json;
 using System.Threading.Tasks;
 
 namespace HwMonLinux
@@ -17,14 +16,36 @@ namespace HwMonLinux
 
         private Process _process;
         private StreamReader _outputReader;
-        private StringBuilder _outputBuffer = new StringBuilder();
+        private byte[] _outputBuffer; // Let the buffer resize dynamically if needed
+        private int _outputBufferLength = 0;
         private bool _disposed = false;
         private SensorData _currentSensorData;
+        private static readonly char[] _lineSeparators = ['\n'];
+        private static readonly char[] _csvSeparators = [','];
+        private Dictionary<int, string> _dynamicHeaderMap = new Dictionary<int, string>();
+        private readonly Dictionary<string, string> _headerMapping = new Dictionary<string, string>()
+        {
+            { "Freq MHz req", "GPU Requested Frequency (MHz)" },
+            { "Freq MHz act", "GPU Frequency (MHz)" },
+            { "IRQ /s", "GPU IRQ Rate (/s)" },
+            { "RC6 %", "GPU RC6 Residency (%)" },
+            { "Power W gpu", "GPU Power (W)" },
+            { "Power W pkg", "GPU Package Power (W)" },
+            { "RCS %", "GPU Render/3D Utilization (%)" },
+            { "BCS %", "GPU Blitter Utilization (%)" },
+            { "VCS %", "GPU Video Engine Utilization (%)" },
+            { "VECS %", "GPU Video Prostproc Utilization (%)" }
+            // Add mappings for 'se' and 'wa' if you want to expose them
+        };
+        private readonly Dictionary<string, object> _sensorValues;
+        private bool _headersRead = false;
 
         public IntelGpuSensorDataProvider(string friendlyName)
         {
             FriendlyName = friendlyName;
-            _currentSensorData = new SensorData { Values = new Dictionary<string, object>() };
+            _sensorValues = new Dictionary<string, object>();
+            _currentSensorData = new SensorData { Values = _sensorValues }; // Use the pre-allocated dictionary
+            _outputBuffer = new byte[4096]; // Initial buffer size
             StartIntelGpuTop();
         }
 
@@ -32,7 +53,7 @@ namespace HwMonLinux
         {
             _process = new Process();
             _process.StartInfo.FileName = "/usr/bin/intel_gpu_top"; // Adjust path if necessary
-            _process.StartInfo.Arguments = "-J -s 500";
+            _process.StartInfo.Arguments = "-c -s 800"; // Request CSV and set interval to 800ms
             _process.StartInfo.RedirectStandardOutput = true;
             _process.StartInfo.RedirectStandardError = true;
             _process.StartInfo.UseShellExecute = false;
@@ -42,131 +63,130 @@ namespace HwMonLinux
             try
             {
                 _process.Start();
-                _process.BeginOutputReadLine();
-                _process.OutputDataReceived += OnOutputDataReceived;
+                _outputReader = _process.StandardOutput;
+                _process.BeginErrorReadLine(); // Still read errors
                 _process.Exited += OnProcessExited;
+                Task.Run(ReadOutputAsync); // Read output in a separate task
             }
             catch (Exception ex)
             {
                 Console.WriteLine($"Error starting intel_gpu_top: {ex.Message}");
-                // Consider how to handle this error - perhaps retry or mark as unavailable
+                // Consider how to handle this error
             }
         }
 
-        private void OnOutputDataReceived(object sender, DataReceivedEventArgs e)
+        private async Task ReadOutputAsync()
         {
-            if (e?.Data != null)
+            char[] charBuffer = new char[1024];
+            int charsRead;
+            while (_process != null && !_process.HasExited)
             {
-                _outputBuffer.Append(e.Data);
-                // Attempt to parse the buffer
-                ParseOutputBuffer();
+                try
+                {
+                    charsRead = await _outputReader.ReadAsync(charBuffer, 0, charBuffer.Length);
+                    if (charsRead > 0)
+                    {
+                        // Convert the char buffer to bytes and append to the output buffer
+                        int bytesToWrite = Encoding.UTF8.GetBytes(charBuffer, 0, charsRead, _outputBuffer, _outputBufferLength);
+                        _outputBufferLength += bytesToWrite;
+
+                        // Process the buffer
+                        ParseOutputBuffer();
+
+                        // Resize the buffer if it's full and we haven't found a newline
+                        if (_outputBufferLength == _outputBuffer.Length)
+                        {
+                            int lastNewline = Array.IndexOf<byte>(_outputBuffer, (byte)'\n', 0, _outputBufferLength);
+                            if (lastNewline == -1)
+                            {
+                                // Resize the buffer to accommodate longer lines
+                                Array.Resize(ref _outputBuffer, _outputBuffer.Length * 2);
+                            }
+                            else
+                            {
+                                // Shift remaining data to the beginning
+                                int remainingLength = _outputBufferLength - (lastNewline + 1);
+                                Buffer.BlockCopy(_outputBuffer, lastNewline + 1, _outputBuffer, 0, remainingLength);
+                                _outputBufferLength = remainingLength;
+                            }
+                        }
+                    }
+                    else if (_process.HasExited)
+                    {
+                        break;
+                    }
+                }
+                catch (IOException ex)
+                {
+                    Console.WriteLine($"Error reading intel_gpu_top output: {ex.Message}");
+                    break;
+                }
             }
         }
 
         private void ParseOutputBuffer()
         {
-            string currentBuffer = _outputBuffer.ToString();
-            int startIndex = -1;
-            int endIndex = -1;
-            int openBraceCount = 0;
+            if (_outputBufferLength == 0)
+                return;
 
-            for (int i = 0; i < currentBuffer.Length; i++)
+            string bufferAsString = Encoding.UTF8.GetString(_outputBuffer, 0, _outputBufferLength);
+            string[] lines = bufferAsString.Split(_lineSeparators, StringSplitOptions.RemoveEmptyEntries);
+
+            if (lines.Length > 0)
             {
-                if (currentBuffer[i] == '{')
+                lock (_currentSensorData)
                 {
-                    if (openBraceCount == 0)
+                    if (!_headersRead)
                     {
-                        startIndex = i;
-                    }
-                    openBraceCount++;
-                }
-                else if (currentBuffer[i] == '}')
-                {
-                    openBraceCount--;
-                    if (openBraceCount == 0 && startIndex != -1)
-                    {
-                        endIndex = i;
-                        break; // Found the first complete JSON object
-                    }
-                }
-            }
-
-            if (startIndex != -1 && endIndex != -1)
-            {
-                string validJsonSegment = currentBuffer.Substring(startIndex, endIndex - startIndex + 1).Trim();
-
-                // Remove the processed JSON segment from the buffer
-                _outputBuffer.Remove(0, endIndex + 1);
-
-                // Handle potential leading comma in the remaining buffer
-                if (_outputBuffer.Length > 0 && _outputBuffer[0] == ',')
-                {
-                    _outputBuffer.Remove(0, 1);
-                }
-
-                try
-                {
-                    using (JsonDocument document = JsonDocument.Parse(validJsonSegment))
-                    {
-                        lock (_currentSensorData)
+                        string headerLine = lines.FirstOrDefault();
+                        if (headerLine != null && headerLine.Contains(_csvSeparators[0]))
                         {
-                            _currentSensorData.Values.Clear();
-
-                            if (document.RootElement.TryGetProperty("frequency", out var frequencyElement))
+                            string[] headers = headerLine.Split(_csvSeparators, StringSplitOptions.TrimEntries);
+                            _dynamicHeaderMap.Clear();
+                            for (int i = 0; i < headers.Length; i++)
                             {
-                                if (frequencyElement.TryGetProperty("actual", out var actualFreqElement) &&
-                                    actualFreqElement.TryGetDouble(out double actualFreq))
+                                if (_headerMapping.ContainsKey(headers[i]))
                                 {
-                                    _currentSensorData.Values["GPU Frequency (MHz)"] = actualFreq;
+                                    _dynamicHeaderMap[i] = headers[i];
                                 }
                             }
+                            _headersRead = true;
+                            lines = lines.Skip(1).ToArray(); // Skip the header line for data processing
+                        }
+                        else if (headerLine != null)
+                        {
+                            // If the first line doesn't look like headers, we might be in a state where the process just started
+                            return;
+                        }
+                    }
 
-                            if (document.RootElement.TryGetProperty("engines", out var enginesElement))
+                    if (_headersRead && lines.Length > 0)
+                    {
+                        _sensorValues.Clear();
+                        string lastLine = lines.LastOrDefault();
+                        if (lastLine != null)
+                        {
+                            string[] values = lastLine.Split(_csvSeparators, StringSplitOptions.TrimEntries);
+
+                            foreach (var kvp in _dynamicHeaderMap)
                             {
-                                foreach (var engineProperty in enginesElement.EnumerateObject())
+                                int index = kvp.Key;
+                                string header = kvp.Value;
+
+                                if (index < values.Length)
                                 {
-                                    if (engineProperty.Value.TryGetProperty("busy", out var busyElement) &&
-                                        busyElement.TryGetDouble(out double busyPercentage))
+                                    if (_headerMapping.TryGetValue(header, out string mappedName) &&
+                                        double.TryParse(values[index], NumberStyles.Float, CultureInfo.InvariantCulture, out double value))
                                     {
-                                        _currentSensorData.Values[$"GPU {engineProperty.Name} Utilization (%)"] = busyPercentage;
+                                        _sensorValues[mappedName] = value;
                                     }
-                                }
-                            }
-
-                            if (document.RootElement.TryGetProperty("power", out var powerElement))
-                            {
-                                if (powerElement.TryGetProperty("GPU", out var gpuPowerElement) &&
-                                    gpuPowerElement.TryGetDouble(out double gpuPower))
-                                {
-                                    _currentSensorData.Values["GPU Power (W)"] = gpuPower;
-                                }
-                                if (powerElement.TryGetProperty("Package", out var packageElement) &&
-                                    packageElement.TryGetDouble(out double packagePower))
-                                {
-                                    _currentSensorData.Values["GPU Package Power (W)"] = packagePower;
-                                }
-                            }
-
-                            if (document.RootElement.TryGetProperty("rc6", out var rc6Element))
-                            {
-                                if (rc6Element.TryGetProperty("value", out var valueElement) &&
-                                    valueElement.TryGetDouble(out double rc6Residency))
-                                {
-                                    _currentSensorData.Values["GPU RC6 Residency (%)"] = rc6Residency;
                                 }
                             }
                         }
                     }
                 }
-                catch (JsonException ex)
-                {
-                    Console.WriteLine($"Warning: Error parsing JSON from intel_gpu_top: {ex.Message} - Output: '{validJsonSegment}'");
-                }
-
-                // Process any remaining complete JSON objects in the buffer
-                ParseOutputBuffer();
+                _outputBufferLength = 0; // Reset the buffer length
             }
-            // If no complete JSON object is found, we wait for more data
         }
 
         private void OnProcessExited(object sender, EventArgs e)
@@ -189,27 +209,22 @@ namespace HwMonLinux
             {
                 if (disposing)
                 {
-                    // Dispose managed resources
                     _process?.Kill();
                     _process?.Dispose();
                     _outputReader?.Dispose();
                 }
-
-                // Dispose unmanaged resources (if any)
                 _disposed = true;
             }
         }
 
         public void Dispose()
         {
-            // Do not change this code. Put cleanup code in 'Dispose(bool disposing)' method
             Dispose(disposing: true);
             GC.SuppressFinalize(this);
         }
 
         ~IntelGpuSensorDataProvider()
         {
-            // Finalizer calls Dispose(false)
             Dispose(disposing: false);
         }
     }

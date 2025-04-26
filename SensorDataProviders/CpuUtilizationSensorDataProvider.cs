@@ -13,6 +13,7 @@ namespace HwMonLinux
         private TimeSpan _lastIdleTimeOverall = TimeSpan.Zero;
         private TimeSpan _lastTotalTimeOverall = TimeSpan.Zero;
         private readonly Dictionary<string, (DateTime lastTime, long lastUser, long lastNice, long lastSystem, long lastIdle, long lastIowait, long lastIrq, long lastSoftirq, long lastSteal)> _coreStats = new Dictionary<string, (DateTime, long, long, long, long, long, long, long, long)>();
+        private SensorData _sensorData;
 
         public string Name => "cpu";
 
@@ -23,7 +24,8 @@ namespace HwMonLinux
 
         public SensorData GetSensorData()
         {
-            var data = new SensorData { Values = new Dictionary<string, object>() };
+            _sensorData ??= new();
+            _sensorData.Values ??= new();
 
             if (Environment.OSVersion.Platform == PlatformID.Unix)
             {
@@ -58,7 +60,7 @@ namespace HwMonLinux
                                     if (totalDifference.TotalMilliseconds > 0)
                                     {
                                         double cpuUsage = 1.0 - (idleDifference.TotalMilliseconds / totalDifference.TotalMilliseconds);
-                                        data.Values["Overall Utilization (%)"] = Math.Round(cpuUsage * 100, 2);
+                                        _sensorData.Values["Overall Utilization (%)"] = Math.Round(cpuUsage * 100, 2);
                                     }
                                 }
 
@@ -90,7 +92,7 @@ namespace HwMonLinux
                                     if (timeDiff.TotalMilliseconds > 0 && totalDiff > 0)
                                     {
                                         double coreUsage = 1.0 - (double)idleDiff / totalDiff;
-                                        data.Values[$"Core {coreId} Utilization (%)"] = Math.Round(coreUsage * 100, 2);
+                                        _sensorData.Values[$"Core {coreId} Utilization (%)"] = Math.Round(coreUsage * 100, 2);
                                     }
                                 }
 
@@ -106,11 +108,11 @@ namespace HwMonLinux
             }
             else
             {
-                data.Values["Overall Utilization (%)"] = 0.0;
+                _sensorData.Values["Overall Utilization (%)"] = 0.0;
                 Console.WriteLine("CPU Utilization on non-Unix systems requires platform-specific implementation for accurate historical comparison.");
             }
 
-            return data;
+            return _sensorData;
         }
     }
 }

@@ -15,6 +15,8 @@ namespace HwMonLinux
         private readonly Dictionary<string, string> _sensorNameOverrides;
         public string FriendlyName { get; }
 
+        private SensorData _sensorData;
+
         /// <summary>
         /// Initializes a new instance of the <see cref="LmsensorsSensorDataProvider"/> class.
         /// </summary>
@@ -31,7 +33,9 @@ namespace HwMonLinux
 
         public SensorData GetSensorData()
         {
-            var sensorValues = new Dictionary<string, object>();
+            _sensorData ??= new();
+            _sensorData.Values ??= new();
+            
             try
             {
                 using (var process = new Process())
@@ -96,18 +100,18 @@ namespace HwMonLinux
 
                                 if (float.TryParse(sensorValueRaw, NumberStyles.Float, CultureInfo.InvariantCulture, out float sensorValue))
                                 {
-                                    sensorValues[finalSensorName] = sensorValue;
+                                    _sensorData.Values[finalSensorName] = sensorValue;
                                 }
                                 else if (sensorValueRaw.ToLowerInvariant() == "n/a")
                                 {
-                                    sensorValues[finalSensorName] = null; // Or some other indicator for N/A
+                                    _sensorData.Values[finalSensorName] = null; // Or some other indicator for N/A
                                 }
                                 // You might want to handle other units or states differently
                             }
                         }
                     }
 
-                    return new SensorData { Values = sensorValues };
+                    return _sensorData;
                 }
             }
             catch (Exception ex)

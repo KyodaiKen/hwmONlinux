@@ -11,7 +11,8 @@
     <SelfContained>false</SelfContained>
     <PublishDir>bin/Release/net8.0/linux-x64/publish/</PublishDir>
     <AssemblyName>HwmONlinuxServer</AssemblyName>
-  </PropertyGroup>
+    <PublishReadyToRun>true</PublishReadyToRun>
+    </PropertyGroup>
 
   <ItemGroup>
     <PackageReference Include="System.IO.Ports" Version="9.0.4" />

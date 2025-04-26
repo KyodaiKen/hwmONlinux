@@ -13,6 +13,8 @@ namespace HwMonLinux
         public string Name => "NetworkIO";
         public string FriendlyName { get; }
         private readonly Dictionary<string, string> _sensorNameOverrides;
+        private Dictionary<string, (long ReceivedBytes, long TransmittedBytes)> _networkStats;
+        private SensorData _sensorData;
 
         private Dictionary<string, (long ReceivedBytes, long TransmittedBytes, DateTime Timestamp)> _previousStats = new Dictionary<string, (long, long, DateTime)>();
         private List<string> _networkInterfaces = new List<string>();
@@ -49,13 +51,14 @@ namespace HwMonLinux
 
         public SensorData GetSensorData()
         {
-            var currentStats = ReadNetworkStats();
-            var sensorValues = new Dictionary<string, object>();
+            ReadNetworkStats();
+            _sensorData ??= new();
+            _sensorData.Values ??= new();
             var now = DateTime.UtcNow;
 
             foreach (var iface in _networkInterfaces)
             {
-                if (currentStats.TryGetValue(iface, out var current))
+                if (_networkStats.TryGetValue(iface, out var current))
                 {
                     // Apply sensor name overrides
                     string finalSensorName = iface;
@@ -74,8 +77,8 @@ namespace HwMonLinux
                             var receivedMbps = (double)receivedDiffBytes * 8 / timeDiff.TotalSeconds / (1000 * 1000); // Bytes to Bits, then to MBit/s
                             var transmittedMbps = (double)transmittedDiffBytes * 8 / timeDiff.TotalSeconds / (1000 * 1000); // Bytes to Bits, then to MBit/s
 
-                            sensorValues[$"{finalSensorName} Rx (MBit/s)"] = Math.Round(receivedMbps, 3);
-                            sensorValues[$"{finalSensorName} Tx (MBit/s)"] = Math.Round(transmittedMbps, 3);
+                            _sensorData.Values[$"{finalSensorName} Rx (MBit/s)"] = Math.Round(receivedMbps, 3);
+                            _sensorData.Values[$"{finalSensorName} Tx (MBit/s)"] = Math.Round(transmittedMbps, 3);
                         }
                     }
                     _previousStats[iface] = (current.ReceivedBytes, current.TransmittedBytes, now);
@@ -87,20 +90,20 @@ namespace HwMonLinux
             }
 
             // Add stats for interfaces that became active since last check
-            foreach (var stat in currentStats)
+            foreach (var stat in _networkStats)
             {
-                if (!_networkInterfaces.Contains(stat.Key) && !_previousStats.ContainsKey(stat.Key) && stat.Key.StartsWith("eth"))
+                if (!_networkInterfaces.Contains(stat.Key) && !_previousStats.ContainsKey(stat.Key) && !stat.Key.StartsWith("lo"))
                 {
                     _networkInterfaces.Add(stat.Key);
                     _previousStats[stat.Key] = (stat.Value.ReceivedBytes, stat.Value.TransmittedBytes, now);
                 }
             }
-            return new SensorData { Values = sensorValues };
+            return _sensorData;
         }
 
-        private Dictionary<string, (long ReceivedBytes, long TransmittedBytes)> ReadNetworkStats()
+        private void ReadNetworkStats()
         {
-            var networkStats = new Dictionary<string, (long, long)>();
+            _networkStats ??= new();
             try
             {
                 var procNetDev = File.ReadAllLines("/proc/net/dev");
@@ -112,7 +115,7 @@ namespace HwMonLinux
                         var interfaceName = parts[0];
                         long receivedBytes = long.Parse(parts[1]);
                         long transmittedBytes = long.Parse(parts[9]);
-                        networkStats[interfaceName] = (receivedBytes, transmittedBytes);
+                        _networkStats[interfaceName] = (receivedBytes, transmittedBytes);
                     }
                 }
             }
@@ -120,7 +123,6 @@ namespace HwMonLinux
             {
                 Console.WriteLine($"Error reading /proc/net/dev: {ex.Message}");
             }
-            return networkStats;
         }
 
         protected virtual void Dispose(bool disposing)

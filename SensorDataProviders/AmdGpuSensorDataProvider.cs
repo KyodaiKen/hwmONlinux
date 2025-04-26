@@ -11,6 +11,7 @@ namespace HwMonLinux
         public string Name => "AmdGpu";
         public string FriendlyName { get; }
         private readonly string _hwmonPath = "/sys/class/hwmon";
+        private SensorData _sensorData;
 
         public AmdGpuSensorDataProvider(string friendlyName)
         {
@@ -19,7 +20,9 @@ namespace HwMonLinux
 
         public SensorData GetSensorData()
         {
-            var sensorValues = new Dictionary<string, object>();
+            _sensorData ??= new();
+            _sensorData.Values ??= new();
+
             try
             {
                 string[] hwmonDirs = Directory.GetDirectories(_hwmonPath);
@@ -42,7 +45,7 @@ namespace HwMonLinux
                                 string powerString = File.ReadAllText(powerFile).Trim();
                                 if (double.TryParse(powerString, out double powerMicroWatts))
                                 {
-                                    sensorValues[$"{prefix} Power (W)"] = powerMicroWatts / 1_000_000.0;
+                                    _sensorData.Values[$"{prefix} Power (W)"] = powerMicroWatts / 1_000_000.0;
                                 }
                             }
 
@@ -75,7 +78,7 @@ namespace HwMonLinux
                                 string tempString = File.ReadAllText(tempFile).Trim();
                                 if (int.TryParse(tempString, out int tempMilliCelsius))
                                 {
-                                    sensorValues[tempName] = tempMilliCelsius / 1000.0;
+                                    _sensorData.Values[tempName] = tempMilliCelsius / 1000.0;
                                 }
                             }
 
@@ -96,7 +99,7 @@ namespace HwMonLinux
                                 string fanSpeedString = File.ReadAllText(fanFile).Trim();
                                 if (int.TryParse(fanSpeedString, out int fanSpeedRpm))
                                 {
-                                    sensorValues[fanName] = fanSpeedRpm;
+                                    _sensorData.Values[fanName] = fanSpeedRpm;
                                 }
                             }
 
@@ -109,14 +112,14 @@ namespace HwMonLinux
                                 string utilizationString = File.ReadAllText(utilizationFile).Trim();
                                 if (int.TryParse(utilizationString, out int utilizationPercent))
                                 {
-                                    sensorValues[$"{prefix} Utilization (%)"] = utilizationPercent;
+                                    _sensorData.Values[$"{prefix} Utilization (%)"] = utilizationPercent;
                                 }
                             }
                         }
                     }
                 }
 
-                return new SensorData { Values = sensorValues };
+                return _sensorData;
             }
             catch (Exception ex)
             {

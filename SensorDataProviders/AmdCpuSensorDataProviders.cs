@@ -14,6 +14,7 @@ namespace HwMonLinux
         private readonly string _powerFilePath;
         private double _previousEnergyJoules = 0;
         private DateTime _previousReadTime = DateTime.MinValue;
+        private SensorData _sensorData;
 
         public AmdPackagePowerSensorDataProvider(string friendlyName, string powerFilePath = "/sys/class/hwmon/hwmon*/power1_average")
         {
@@ -29,7 +30,9 @@ namespace HwMonLinux
 
         public SensorData GetSensorData()
         {
-            var sensorValues = new Dictionary<string, object>();
+            _sensorData ??= new();
+            _sensorData.Values ??= new();
+
             try
             {
                 // Find the actual power file path
@@ -42,7 +45,7 @@ namespace HwMonLinux
                     if (double.TryParse(powerString, NumberStyles.Float, CultureInfo.InvariantCulture, out double currentPowerMicroWatts))
                     {
                         double currentPowerWatts = currentPowerMicroWatts / 1_000_000.0;
-                        sensorValues["Package Power (W)"] = currentPowerWatts;
+                        _sensorData.Values ["Package Power (W)"] = currentPowerWatts;
                     }
                     else
                     {
@@ -54,7 +57,7 @@ namespace HwMonLinux
                     Console.WriteLine($"Warning: AMD CPU power statistics file not found matching '{_powerFilePath}'.");
                 }
 
-                return new SensorData { Values = sensorValues };
+                return _sensorData;
             }
             catch (Exception ex)
             {
@@ -69,6 +72,7 @@ namespace HwMonLinux
         public string Name => "AmdCpuTemperature";
         public string FriendlyName { get; }
         private readonly string _tempFilePathPattern;
+        private SensorData _sensorData;
 
         public AmdCpuTemperatureSensorDataProvider(string friendlyName, string tempFilePathPattern = "/sys/class/hwmon/hwmon*/temp*_input")
         {
@@ -83,7 +87,9 @@ namespace HwMonLinux
 
         public SensorData GetSensorData()
         {
-            var sensorValues = new Dictionary<string, object>();
+            _sensorData ??= new();
+            _sensorData.Values ??= new();
+
             try
             {
                 string[] tempFiles = Directory.GetFiles("/sys/class/hwmon", "temp*_input")
@@ -122,7 +128,7 @@ namespace HwMonLinux
                                 }
                             }
                         }
-                        sensorValues[sensorName] = Math.Round(temperatureCelsius, 1);
+                        _sensorData.Values[sensorName] = Math.Round(temperatureCelsius, 1);
                     }
                     else
                     {
@@ -130,7 +136,7 @@ namespace HwMonLinux
                     }
                 }
 
-                return new SensorData { Values = sensorValues };
+                return _sensorData;
             }
             catch (Exception ex)
             {

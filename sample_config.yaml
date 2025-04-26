@@ -81,8 +81,8 @@ sensorProviders:
     publishedSensors:
       - "GPU Render/3D Utilization (%)"
       - "GPU Blitter Utilization (%)"
-      - "GPU Video Utilization (%)"
-      - "GPU VideoEnhance Utilization (%)"
+      - "GPU Video Engine Utilization (%)"
+      - "GPU Video Prostproc Utilization (%)"
       - "GPU Frequency (MHz)"
       - "GPU Power (W)"
   - type: "HwMonLinux.NetworkIoSensorDataProvider, HwmONlinuxServer"
@@ -141,8 +141,8 @@ sensorGroups:
     sensorIdentifiers:
       - "Intel iGPU GPU Render/3D Utilization (%)"
       - "Intel iGPU GPU Blitter Utilization (%)"
-      - "Intel iGPU GPU Video Utilization (%)"
-      - "Intel iGPU GPU VideoEnhance Utilization (%)"
+      - "Intel iGPU GPU Video Engine Utilization (%)"
+      - "Intel iGPU GPU Video Prostproc Utilization (%)"
       - "Intel iGPU GPU Frequency (MHz)"
       - "Intel iGPU GPU Power (W)"
   - name: "gpu"

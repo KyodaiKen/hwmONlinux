@@ -8,9 +8,10 @@ namespace HwMonLinux
 {
     public class MemoryUtilizationSensorDataProvider : ISensorDataProvider
     {
+        public string Name => "memory";
         public string FriendlyName { get; }
 
-        public string Name => "memory";
+        private SensorData _sensorData;
 
         public MemoryUtilizationSensorDataProvider(string friendlyName)
         {
@@ -19,7 +20,8 @@ namespace HwMonLinux
 
         public SensorData GetSensorData()
         {
-            var data = new SensorData { Values = new Dictionary<string, object>() };
+            _sensorData ??= new();
+            _sensorData.Values ??= new();
 
             if (Environment.OSVersion.Platform == PlatformID.Unix)
             {
@@ -39,31 +41,31 @@ namespace HwMonLinux
                     {
                         if (line.StartsWith("MemTotal:", StringComparison.OrdinalIgnoreCase))
                         {
-                            if (TryParseKbValue(line, out totalMemoryKb)) ;
+                            TryParseKbValue(line, out totalMemoryKb);
                         }
                         else if (line.StartsWith("MemFree:", StringComparison.OrdinalIgnoreCase))
                         {
-                            if (TryParseKbValue(line, out freeMemoryKb)) ;
+                            TryParseKbValue(line, out freeMemoryKb);
                         }
                         else if (line.StartsWith("MemAvailable:", StringComparison.OrdinalIgnoreCase))
                         {
-                            if (TryParseKbValue(line, out availableMemoryKb)) ;
+                            TryParseKbValue(line, out availableMemoryKb);
                         }
                         else if (line.StartsWith("Buffers:", StringComparison.OrdinalIgnoreCase))
                         {
-                            if (TryParseKbValue(line, out buffersKb)) ;
+                            TryParseKbValue(line, out buffersKb);
                         }
                         else if (line.StartsWith("Cached:", StringComparison.OrdinalIgnoreCase))
                         {
-                            if (TryParseKbValue(line, out cachedKb)) ;
+                            TryParseKbValue(line, out cachedKb);
                         }
                         else if (line.StartsWith("SwapTotal:", StringComparison.OrdinalIgnoreCase))
                         {
-                            if (TryParseKbValue(line, out swapTotalKb)) ;
+                            TryParseKbValue(line, out swapTotalKb);
                         }
                         else if (line.StartsWith("SwapFree:", StringComparison.OrdinalIgnoreCase))
                         {
-                            if (TryParseKbValue(line, out swapFreeKb)) ;
+                            TryParseKbValue(line, out swapFreeKb);
                         }
                     }
 
@@ -72,10 +74,10 @@ namespace HwMonLinux
                     {
                         long usedMemoryKb = totalMemoryKb - freeMemoryKb - buffersKb - cachedKb;
                         double memoryUsage = (double)usedMemoryKb / totalMemoryKb;
-                        data.Values["Memory Utilization (%)"] = Math.Round(memoryUsage * 100, 2);
-                        data.Values["Memory Total (GB)"] = Math.Round((double)totalMemoryKb / (1024 * 1024), 2);
-                        data.Values["Memory Used (GB)"] = Math.Round((double)usedMemoryKb / (1024 * 1024), 2);
-                        data.Values["Memory Free (GB)"] = Math.Round((double)(freeMemoryKb + buffersKb + cachedKb) / (1024 * 1024), 2);
+                        _sensorData.Values["Memory Utilization (%)"] = Math.Round(memoryUsage * 100, 2);
+                        _sensorData.Values["Memory Total (GB)"] = Math.Round((double)totalMemoryKb / (1024 * 1024), 2);
+                        _sensorData.Values["Memory Used (GB)"] = Math.Round((double)usedMemoryKb / (1024 * 1024), 2);
+                        _sensorData.Values["Memory Free (GB)"] = Math.Round((double)(freeMemoryKb + buffersKb + cachedKb) / (1024 * 1024), 2);
                     }
 
                     // Calculate swap utilization
@@ -83,17 +85,17 @@ namespace HwMonLinux
                     {
                         long usedSwapKb = swapTotalKb - swapFreeKb;
                         double swapUsage = (double)usedSwapKb / swapTotalKb;
-                        data.Values["Swap Utilization (%)"] = Math.Round(swapUsage * 100, 2);
-                        data.Values["Swap Total (GB)"] = Math.Round((double)swapTotalKb / (1024 * 1024), 2);
-                        data.Values["Swap Used (GB)"] = Math.Round((double)usedSwapKb / (1024 * 1024), 2);
-                        data.Values["Swap Free (GB)"] = Math.Round((double)swapFreeKb / (1024 * 1024), 2);
+                        _sensorData.Values["Swap Utilization (%)"] = Math.Round(swapUsage * 100, 2);
+                        _sensorData.Values["Swap Total (GB)"] = Math.Round((double)swapTotalKb / (1024 * 1024), 2);
+                        _sensorData.Values["Swap Used (GB)"] = Math.Round((double)usedSwapKb / (1024 * 1024), 2);
+                        _sensorData.Values["Swap Free (GB)"] = Math.Round((double)swapFreeKb / (1024 * 1024), 2);
                     }
                     else
                     {
-                        data.Values["Swap Utilization (%)"] = 0.0;
-                        data.Values["Swap Total (GB)"] = 0.0;
-                        data.Values["Swap Used (GB)"] = 0.0;
-                        data.Values["Swap Free (GB)"] = 0.0;
+                        _sensorData.Values["Swap Utilization (%)"] = 0.0;
+                        _sensorData.Values["Swap Total (GB)"] = 0.0;
+                        _sensorData.Values["Swap Used (GB)"] = 0.0;
+                        _sensorData.Values["Swap Free (GB)"] = 0.0;
                     }
                 }
                 catch (Exception ex)
@@ -103,18 +105,18 @@ namespace HwMonLinux
             }
             else
             {
-                data.Values["Memory Utilization (%)"] = 0.0;
-                data.Values["Memory Total (GB)"] = 0.0;
-                data.Values["Memory Used (GB)"] = 0.0;
-                data.Values["Memory Free (GB)"] = 0.0;
-                data.Values["Swap Utilization (%)"] = 0.0;
-                data.Values["Swap Total (GB)"] = 0.0;
-                data.Values["Swap Used (GB)"] = 0.0;
-                data.Values["Swap Free (GB)"] = 0.0;
+                _sensorData.Values["Memory Utilization (%)"] = 0.0;
+                _sensorData.Values["Memory Total (GB)"] = 0.0;
+                _sensorData.Values["Memory Used (GB)"] = 0.0;
+                _sensorData.Values["Memory Free (GB)"] = 0.0;
+                _sensorData.Values["Swap Utilization (%)"] = 0.0;
+                _sensorData.Values["Swap Total (GB)"] = 0.0;
+                _sensorData.Values["Swap Used (GB)"] = 0.0;
+                _sensorData.Values["Swap Free (GB)"] = 0.0;
                 Console.WriteLine("Memory utilization on non-Unix systems requires platform-specific implementation.");
             }
 
-            return data;
+            return _sensorData;
         }
 
         private static bool TryParseKbValue(string line, out long valueKb)

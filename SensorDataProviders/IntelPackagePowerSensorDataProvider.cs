@@ -15,6 +15,7 @@ namespace HwMonLinux
         private readonly string _energyFilePath;
         private ulong _previousEnergyMicroJoules = 0;
         private DateTime _previousReadTime = DateTime.MinValue;
+        private SensorData _sensorData;
 
         public IntelPackagePowerSensorDataProvider(string friendlyName, string energyFilePath = "/sys/class/powercap/intel-rapl/intel-rapl:0/energy_uj")
         {
@@ -29,7 +30,9 @@ namespace HwMonLinux
 
         public SensorData GetSensorData()
         {
-            var sensorValues = new Dictionary<string, object>();
+            _sensorData ??= new();
+            _sensorData.Values ??= new();
+
             try
             {
                 if (File.Exists(_energyFilePath))
@@ -47,7 +50,7 @@ namespace HwMonLinux
                             {
                                 // Convert microjoules to joules and divide by time in seconds to get Watts
                                 double powerWatts = (double)energyDiff / timeDiff.TotalSeconds / 1_000_000.0;
-                                sensorValues["Package Power (W)"] = powerWatts;
+                                _sensorData.Values["Package Power (W)"] = powerWatts;
                             }
                         }
                         _previousEnergyMicroJoules = currentEnergyMicroJoules;
@@ -63,7 +66,7 @@ namespace HwMonLinux
                     Console.WriteLine($"Warning: Energy statistics file not found at '{_energyFilePath}'.");
                 }
 
-                return new SensorData { Values = sensorValues };
+                return _sensorData;
             }
             catch (Exception ex)
             {

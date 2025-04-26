@@ -22,6 +22,12 @@ namespace HwMonLinux
         public string Name => "KKFC01";
         public string FriendlyName { get; }
 
+        //Persistent memory to avoid reallocations
+        private byte[] _receivedBuffer;
+        private int _bytesRead;
+        private float[] _unpackedData;
+        private SensorData _sensorData;
+
         public KKFC01SensorDataProvider(string friendlyName, string portName, int baudRate, string queryCommand, string identificationString)
         {
             FriendlyName = friendlyName;
@@ -33,6 +39,9 @@ namespace HwMonLinux
             _serialPort = new SerialPort(_portName, _baudRate, Parity.None, 8, StopBits.One);
             _serialPort.ReadTimeout = SerialTimeoutMs;
             _serialPort.WriteTimeout = SerialTimeoutMs;
+
+            _receivedBuffer = new byte[_floatSize * _numEntries * 3];
+            _unpackedData = new float[_numEntries * 3];
 
             if (!Connect())
             {
@@ -99,34 +108,30 @@ namespace HwMonLinux
             try
             {
                 _serialPort.Write(_queryCommand);
-                byte[] receivedBuffer = new byte[_floatSize * _numEntries * 3];
-                int bytesRead = _serialPort.Read(receivedBuffer, 0, receivedBuffer.Length);
+                _bytesRead = _serialPort.Read(_receivedBuffer, 0, _receivedBuffer.Length);
 
-                if (bytesRead == receivedBuffer.Length)
+                if (_bytesRead == _receivedBuffer.Length)
                 {
-                    float[] unpackedData = new float[_numEntries * 3];
-                    for (int i = 0; i < unpackedData.Length; i++)
+                    for (int i = 0; i < _unpackedData.Length; i++)
                     {
-                        unpackedData[i] = BitConverter.ToSingle(receivedBuffer, i * _floatSize);
+                        _unpackedData[i] = BitConverter.ToSingle(_receivedBuffer, i * _floatSize);
                     }
 
-                    return new SensorData
-                    {
-                        Values = new Dictionary<string, object>
-                        {
-                            { "Water Temperature (°C)", unpackedData[0] },
-                            { "Case Temperature (°C)", unpackedData[1] },
-                            { "Ambient Temperature (°C)", unpackedData[2] },
-                            { "Water MV", unpackedData[3] },
-                            { "Case MV", unpackedData[5] },
-                            { "Radiator Fan Speed (%)", unpackedData[6] },
-                            { "Case Fan Speed (%)", unpackedData[8] }
-                        }
-                    };
+                    _sensorData ??= new();
+                    _sensorData.Values ??= new();
+                    _sensorData.Values["Water Temperature (°C)"] = _unpackedData[0];
+                    _sensorData.Values["Case Temperature (°C)"] = _unpackedData[1];
+                    _sensorData.Values["Ambient Temperature (°C)"] = _unpackedData[2];
+                    _sensorData.Values["Water MV"] = _unpackedData[3];
+                    _sensorData.Values["Case MV"] = _unpackedData[5];
+                    _sensorData.Values["Radiator Fan Speed (%)"] = _unpackedData[6];
+                    _sensorData.Values["Water Temperature (°C)"] = _unpackedData[8];
+
+                    return _sensorData;
                 }
                 else
                 {
-                    Console.WriteLine($"Error: Received bytes ({bytesRead}) do not match the expected count ({receivedBuffer.Length}).");
+                    Console.WriteLine($"Error: Received bytes ({_bytesRead}) do not match the expected count ({_receivedBuffer.Length}).");
                     return null;
                 }
             }

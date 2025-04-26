@@ -16,6 +16,8 @@ namespace HwMonLinux
 
         private Dictionary<string, (long ReadBytes, long WriteBytes, DateTime Timestamp)> _previousStats = new Dictionary<string, (long, long, DateTime)>();
         private List<string> _mountPoints = new List<string>();
+        private SensorData _sensorData;
+        private Dictionary<string, (long ReadBytes, long WriteBytes)> _currentStats;
         private bool _disposed = false;
 
         public DiskIoSensorDataProvider(string friendlyName, Dictionary<string, string> sensorNameOverrides = null)
@@ -52,13 +54,14 @@ namespace HwMonLinux
 
         public SensorData GetSensorData()
         {
-            var currentStats = ReadDiskStats();
-            var sensorValues = new Dictionary<string, object>();
+            _sensorData ??= new();
+            _sensorData.Values ??= new();
+            ReadDiskStats();
             var now = DateTime.UtcNow;
 
             foreach (var mountPoint in _mountPoints)
             {
-                if (currentStats.TryGetValue(mountPoint, out var current))
+                if (_currentStats.TryGetValue(mountPoint, out var current))
                 {
                     // Apply sensor name overrides
                     string finalSensorName = mountPoint.Split('/')[2];
@@ -74,11 +77,11 @@ namespace HwMonLinux
                             var readDiffBytes = current.ReadBytes - previous.ReadBytes;
                             var writeDiffBytes = current.WriteBytes - previous.WriteBytes;
 
-                            var readMBps = (double)readDiffBytes / timeDiff.TotalSeconds / (1024 * 1024);
-                            var writeMBps = (double)writeDiffBytes / timeDiff.TotalSeconds / (1024 * 1024);
+                            var readMBps = readDiffBytes / timeDiff.TotalSeconds / (1024 * 1024d);
+                            var writeMBps = writeDiffBytes / timeDiff.TotalSeconds / (1024 * 1024d);
 
-                            sensorValues[$"{finalSensorName} Read (MB/s)"] = Math.Round(readMBps, 3);
-                            sensorValues[$"{finalSensorName} Write (MB/s)"] = Math.Round(writeMBps, 3);
+                            _sensorData.Values[$"{finalSensorName} Read (MB/s)"] = Math.Round(readMBps, 3);
+                            _sensorData.Values[$"{finalSensorName} Write (MB/s)"] = Math.Round(writeMBps, 3);
                         }
                     }
                     _previousStats[mountPoint] = (current.ReadBytes, current.WriteBytes, now);
@@ -90,7 +93,7 @@ namespace HwMonLinux
             }
 
             // Add stats for disks that appeared since last check
-            foreach (var stat in currentStats)
+            foreach (var stat in _currentStats)
             {
                 if (!_mountPoints.Contains(stat.Key) && !_previousStats.ContainsKey(stat.Key) && !stat.Key.Contains("/run/user/") && !stat.Key.StartsWith("/media/"))
                 {
@@ -99,12 +102,12 @@ namespace HwMonLinux
                 }
             }
 
-            return new SensorData { Values = sensorValues };
+            return _sensorData;
         }
 
-        private Dictionary<string, (long ReadBytes, long WriteBytes)> ReadDiskStats()
+        private void ReadDiskStats()
         {
-            var diskStats = new Dictionary<string, (long, long)>();
+            _currentStats ??= new();
             try
             {
                 var procDiskStats = File.ReadAllLines("/proc/diskstats");
@@ -119,7 +122,7 @@ namespace HwMonLinux
                             long readSectors = long.Parse(parts[5]);
                             long writeSectors = long.Parse(parts[9]);
                             long sectorSize = 512; // Assuming 512 byte sectors (most common)
-                            diskStats[$"/dev/{deviceName}"] = (readSectors * sectorSize, writeSectors * sectorSize);
+                            _currentStats[$"/dev/{deviceName}"] = (readSectors * sectorSize, writeSectors * sectorSize);
                         }
                     }
                 }
@@ -128,7 +131,6 @@ namespace HwMonLinux
             {
                 Console.WriteLine($"Error reading /proc/diskstats: {ex.Message}");
             }
-            return diskStats;
         }
 
         protected virtual void Dispose(bool disposing)

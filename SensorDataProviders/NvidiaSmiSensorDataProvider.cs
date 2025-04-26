@@ -12,31 +12,8 @@ namespace HwMonLinux
         public string FriendlyName { get; }
         private readonly List<string> _queriedSensors;
         private readonly Dictionary<string, string> _sensorNameOverrides;
-        /*private readonly Dictionary<string, string> _sensorUnits = new Dictionary<string, string>
-        {
-            { "temperature.gpu", "°C" },
-            { "temperature.memory", "°C" },
-            { "utilization.gpu", "%" },
-            { "utilization.memory", "%" },
-            { "utilization.encoder", "%" },
-            { "utilization.decoder", "%" },
-            { "utilization.ofa", "%" },
-            { "power.draw", "W" },
-            { "power.draw.instant", "W" },
-            { "clocks.current.graphics", "MHz" },
-            { "clocks.current.sm", "MHz" },
-            { "clocks.current.mem", "MHz" },
-            { "clocks.current.memory", "MHz" },
-            { "clocks.current.video", "MHz" },
-            { "memory.total", "MB" },
-            { "memory.free", "MB" },
-            { "memory.used", "MB" },
-            { "fan.speed", "%" }, // Assuming percentage if no explicit unit
-            { "bar1.total", "MB" },
-            { "bar1.free", "MB" },
-            { "bar1.used", "MB" }
-            // Add units for other relevant metrics if needed
-        };*/
+
+        private SensorData _sensorData;
 
         // A list of all possible nvidia-smi query options (as of a certain point).
         // This list might need to be updated with newer driver versions.
@@ -116,7 +93,9 @@ namespace HwMonLinux
 
         public SensorData GetSensorData()
         {
-            var sensorValues = new Dictionary<string, object>();
+            _sensorData ??= new();
+            _sensorData.Values ??= new();
+
             try
             {
                 string queryArguments = $"--query-gpu={string.Join(",", _queriedSensors)} --format=csv,noheader,nounits";
@@ -133,10 +112,10 @@ namespace HwMonLinux
                     process.WaitForExit();
 
                     var lines = output.Trim().Split('\n');
+                    
                     for (int i = 0; i < lines.Length; i++)
                     {
                         var values = lines[i].Split(',').Select(v => v.Trim()).ToList();
-                        string gpuName = $"GPU{i}"; // Basic GPU naming
 
                         for (int j = 0; j < _queriedSensors.Count && j < values.Count; j++)
                         {
@@ -144,29 +123,22 @@ namespace HwMonLinux
                             string friendlySensorName = _sensorNameOverrides.ContainsKey(rawSensorName) ? _sensorNameOverrides[rawSensorName] : rawSensorName;
                             string fullSensorNameWithUnit = friendlySensorName;
 
-                            /*if (_sensorUnits.TryGetValue(rawSensorName, out string unit))
-                            {
-                                fullSensorNameWithUnit += $" ({unit})";
-                            }*/
-
                             if (float.TryParse(values[j], NumberStyles.Float, CultureInfo.InvariantCulture, out float floatValue))
                             {
-                                sensorValues[fullSensorNameWithUnit] = floatValue;
+                                _sensorData.Values[fullSensorNameWithUnit] = floatValue;
                             }
                             else if (int.TryParse(values[j], NumberStyles.Integer, CultureInfo.InvariantCulture, out int intValue))
                             {
-                                sensorValues[fullSensorNameWithUnit] = intValue;
+                                _sensorData.Values[fullSensorNameWithUnit] = intValue;
                             }
                             else
                             {
-                                sensorValues[fullSensorNameWithUnit] = values[j]; // Store as string if parsing fails
+                                _sensorData.Values[fullSensorNameWithUnit] = values[j];
                             }
                         }
                     }
                 }
-                return new SensorData {
-                    Values = sensorValues
-                };
+                return _sensorData;
             }
             catch (Exception ex)
             {
