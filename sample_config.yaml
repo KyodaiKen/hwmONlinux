@@ -100,9 +100,9 @@ sensorProviders:
     config:
       friendlyName: "Disk I/O"
       sensorNameOverrides:
-        nvme0n1: "Data"
-        nvme1n1: "Fedora"
-        nvme2n1: "Windows"
+        nvme0n1: "Windows"
+        nvme1n1: "Data"
+        nvme2n1: "Fedora"
         nvme3n1: "Games"
     publishedSensors:
       - "Fedora Read (MB/s)"
@@ -113,7 +113,6 @@ sensorProviders:
       - "Data Write (MB/s)"
       - "Games Read (MB/s)"
       - "Games Write (MB/s)"
-
 
 sensorGroups:
   - name: "system_temps"
