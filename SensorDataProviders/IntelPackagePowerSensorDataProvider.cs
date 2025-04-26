@@ -49,8 +49,7 @@ namespace HwMonLinux
                             if (timeDiff.TotalSeconds > 0)
                             {
                                 // Convert microjoules to joules and divide by time in seconds to get Watts
-                                double powerWatts = (double)energyDiff / timeDiff.TotalSeconds / 1_000_000.0;
-                                _sensorData.Values["Package Power (W)"] = powerWatts;
+                                _sensorData.Values["Package Power (W)"] = (float)(energyDiff / timeDiff.TotalSeconds / 1_000_000.0);
                             }
                         }
                         _previousEnergyMicroJoules = currentEnergyMicroJoules;

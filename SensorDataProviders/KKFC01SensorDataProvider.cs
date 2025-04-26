@@ -126,7 +126,7 @@ namespace HwMonLinux
                     _sensorData.Values["Water MV"] = _unpackedData[3];
                     _sensorData.Values["Case MV"] = _unpackedData[5];
                     _sensorData.Values["Radiator Fan Speed (%)"] = _unpackedData[6];
-                    _sensorData.Values["Water Temperature (°C)"] = _unpackedData[8];
+                    _sensorData.Values["Case Fan Speed (%)"] = _unpackedData[8];
 
                     return _sensorData;
                 }

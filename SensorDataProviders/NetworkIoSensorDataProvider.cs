@@ -78,8 +78,8 @@ namespace HwMonLinux
                             var receivedMbps = (double)receivedDiffBytes * 8 / timeDiff.TotalSeconds / (1000 * 1000); // Bytes to Bits, then to MBit/s
                             var transmittedMbps = (double)transmittedDiffBytes * 8 / timeDiff.TotalSeconds / (1000 * 1000); // Bytes to Bits, then to MBit/s
 
-                            _sensorData.Values[$"{finalSensorName} Rx (MBit/s)"] = Math.Round(receivedMbps, 3);
-                            _sensorData.Values[$"{finalSensorName} Tx (MBit/s)"] = Math.Round(transmittedMbps, 3);
+                            _sensorData.Values[$"{finalSensorName} Rx (MBit/s)"] = (float)Math.Round(receivedMbps, 3);
+                            _sensorData.Values[$"{finalSensorName} Tx (MBit/s)"] = (float)Math.Round(transmittedMbps, 3);
                         }
                     }
                     _previousStats[iface] = (current.ReceivedBytes, current.TransmittedBytes, now);

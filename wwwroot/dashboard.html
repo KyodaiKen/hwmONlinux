@@ -82,22 +82,41 @@
             color: #00bfff;
             margin-top: 5px;
         }
+
+        .error-message {
+            color: #ff4d4d; /* Error text color */
+            background-color: #222; /* Dark error background */
+            padding: 10px;
+            border-radius: 5px;
+            margin-bottom: 10px;
+        }
+
+        .info-message {
+            color: #aaa;
+            background-color: #222;
+            padding: 10px;
+            border-radius: 5px;
+            margin-bottom: 10px;
+        }
     </style>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 <body>
     <div class="container">
+        <p class="info-message">Loading sensor data...</p>
     </div>
     <script>
         let chartInstances = {}; // To store chart instances
         let latestValues = {}; // To store the latest values for display
         let initialLoadComplete = false;
+        let hasError = false; // Flag to track if an error occurred
 
         async function initializeDashboard(configData) {
             const container = document.querySelector('.container');
             container.innerHTML = ''; // Clear initial content
             chartInstances = {};
             latestValues = {};
+            hasError = false;
 
             if (configData && configData.sensorGroups && Array.isArray(configData.sensorGroups)) {
                 for (const group of configData.sensorGroups) {
@@ -107,7 +126,7 @@
                     container.appendChild(groupDiv);
                 }
             } else {
-                container.innerHTML = '<p class="info">No sensor groups defined in the received data.</p>';
+                container.innerHTML = '<p class="info-message">No sensor groups defined in the received data.</p>';
             }
         }
 
@@ -189,7 +208,7 @@
                                                     weight: 'bold'
                                                 },
                                                 align: 'center',
-                                                padding: { 
+                                                padding: {
                                                     top: 10,
                                                     bottom: 10
                                                 }
@@ -242,7 +261,6 @@
                                     const latestValueDiv = document.createElement('div');
                                     latestValueDiv.classList.add('latest-value');
                                     latestValueDiv.textContent = 'Current: N/A';
-                                    chartDiv.appendChild(latestValueDiv);
                                     groupDiv.appendChild(chartDiv);
                                     const ctx = canvas.getContext('2d');
                                     chartInstances[chartKey] = new Chart(ctx, chartSetup);
@@ -307,10 +325,16 @@
                 if (!response.ok) {
                     const errorText = await response.text();
                     console.error('Failed to fetch sensor data:', response.status, errorText);
-                    document.querySelector('.container').innerHTML = `<p class="error">Failed to load sensor data. Status: ${response.status} ${errorText}</p>`;
+                    document.querySelector('.container').innerHTML = `<p class="error-message">Failed to load sensor data. Status: ${response.status} ${errorText}</p>`;
+                    hasError = true;
                     return;
                 }
                 const allSensorData = await response.json();
+                if (hasError) {
+                    // If there was an error, re-initialize to clear the error message
+                    initializeDashboard(allSensorData);
+                    hasError = false;
+                }
 
                 if (!initialLoadComplete) {
                     initializeDashboard(allSensorData);
@@ -320,7 +344,8 @@
                 }
             } catch (error) {
                 console.error('Error fetching or processing data:', error);
-                document.querySelector('.container').innerHTML = `<p class="error">Failed to load sensor data. Error: ${error}</p>`;
+                document.querySelector('.container').innerHTML = `<p class="error-message">Failed to load sensor data. Error: ${error}</p>`;
+                hasError = true;
             }
         }
 

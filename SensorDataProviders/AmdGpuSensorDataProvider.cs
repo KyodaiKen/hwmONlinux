@@ -45,7 +45,7 @@ namespace HwMonLinux
                                 string powerString = File.ReadAllText(powerFile).Trim();
                                 if (double.TryParse(powerString, out double powerMicroWatts))
                                 {
-                                    _sensorData.Values[$"{prefix} Power (W)"] = powerMicroWatts / 1_000_000.0;
+                                    _sensorData.Values[$"{prefix} Power (W)"] = (float)(powerMicroWatts / 1_000_000.0);
                                 }
                             }
 
@@ -78,7 +78,7 @@ namespace HwMonLinux
                                 string tempString = File.ReadAllText(tempFile).Trim();
                                 if (int.TryParse(tempString, out int tempMilliCelsius))
                                 {
-                                    _sensorData.Values[tempName] = tempMilliCelsius / 1000.0;
+                                    _sensorData.Values[tempName] = (float)(tempMilliCelsius / 1000.0);
                                 }
                             }
 

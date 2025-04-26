@@ -127,10 +127,6 @@ namespace HwMonLinux
                         {
                             _sensorData.Values[fullSensorNameWithUnit] = intValue;
                         }
-                        else
-                        {
-                            _sensorData.Values[fullSensorNameWithUnit] = values[j];
-                        }
                     }
                     values = [];
                 }

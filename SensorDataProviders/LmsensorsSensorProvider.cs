@@ -103,10 +103,6 @@ namespace HwMonLinux
                             {
                                 _sensorData.Values[finalSensorName] = sensorValue;
                             }
-                            else if (sensorValueRaw.ToLowerInvariant() == "n/a")
-                            {
-                                _sensorData.Values[finalSensorName] = null; // Or some other indicator for N/A
-                            }
                             // You might want to handle other units or states differently
                         }
                     }

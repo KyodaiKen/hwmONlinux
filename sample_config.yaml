@@ -90,7 +90,7 @@ sensorProviders:
       friendlyName: "Network I/O"
       sensorNameOverrides:
         eno1: "10G NAS"
-        enp65s0: "FritzBox"
+        eno2: "FritzBox"
     publishedSensors:
       - "10G NAS Rx (MBit/s)"
       - "10G NAS Tx (MBit/s)"

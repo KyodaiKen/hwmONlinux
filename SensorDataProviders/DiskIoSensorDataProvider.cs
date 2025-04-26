@@ -81,8 +81,8 @@ namespace HwMonLinux
                             var readMBps = readDiffBytes / timeDiff.TotalSeconds / (1024 * 1024d);
                             var writeMBps = writeDiffBytes / timeDiff.TotalSeconds / (1024 * 1024d);
 
-                            _sensorData.Values[$"{finalSensorName} Read (MB/s)"] = Math.Round(readMBps, 3);
-                            _sensorData.Values[$"{finalSensorName} Write (MB/s)"] = Math.Round(writeMBps, 3);
+                            _sensorData.Values[$"{finalSensorName} Read (MB/s)"] = (float)Math.Round(readMBps, 3);
+                            _sensorData.Values[$"{finalSensorName} Write (MB/s)"] = (float)Math.Round(writeMBps, 3);
                         }
                     }
                     _previousStats[mountPoint] = (current.ReadBytes, current.WriteBytes, now);

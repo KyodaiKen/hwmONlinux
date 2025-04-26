@@ -74,10 +74,10 @@ namespace HwMonLinux
                     {
                         long usedMemoryKb = totalMemoryKb - freeMemoryKb - buffersKb - cachedKb;
                         double memoryUsage = (double)usedMemoryKb / totalMemoryKb;
-                        _sensorData.Values["Memory Utilization (%)"] = Math.Round(memoryUsage * 100, 2);
-                        _sensorData.Values["Memory Total (GB)"] = Math.Round((double)totalMemoryKb / (1024 * 1024), 2);
-                        _sensorData.Values["Memory Used (GB)"] = Math.Round((double)usedMemoryKb / (1024 * 1024), 2);
-                        _sensorData.Values["Memory Free (GB)"] = Math.Round((double)(freeMemoryKb + buffersKb + cachedKb) / (1024 * 1024), 2);
+                        _sensorData.Values["Memory Utilization (%)"] = (float)Math.Round(memoryUsage * 100, 2);
+                        _sensorData.Values["Memory Total (GB)"] = (float)Math.Round((double)totalMemoryKb / (1024 * 1024), 2);
+                        _sensorData.Values["Memory Used (GB)"] = (float)Math.Round((double)usedMemoryKb / (1024 * 1024), 2);
+                        _sensorData.Values["Memory Free (GB)"] = (float)Math.Round((double)(freeMemoryKb + buffersKb + cachedKb) / (1024 * 1024), 2);
                     }
 
                     // Calculate swap utilization
@@ -85,17 +85,17 @@ namespace HwMonLinux
                     {
                         long usedSwapKb = swapTotalKb - swapFreeKb;
                         double swapUsage = (double)usedSwapKb / swapTotalKb;
-                        _sensorData.Values["Swap Utilization (%)"] = Math.Round(swapUsage * 100, 2);
-                        _sensorData.Values["Swap Total (GB)"] = Math.Round((double)swapTotalKb / (1024 * 1024), 2);
-                        _sensorData.Values["Swap Used (GB)"] = Math.Round((double)usedSwapKb / (1024 * 1024), 2);
-                        _sensorData.Values["Swap Free (GB)"] = Math.Round((double)swapFreeKb / (1024 * 1024), 2);
+                        _sensorData.Values["Swap Utilization (%)"] = (float)Math.Round(swapUsage * 100, 2);
+                        _sensorData.Values["Swap Total (GB)"] = (float)Math.Round((double)swapTotalKb / (1024 * 1024), 2);
+                        _sensorData.Values["Swap Used (GB)"] = (float)Math.Round((double)usedSwapKb / (1024 * 1024), 2);
+                        _sensorData.Values["Swap Free (GB)"] = (float)Math.Round((double)swapFreeKb / (1024 * 1024), 2);
                     }
                     else
                     {
-                        _sensorData.Values["Swap Utilization (%)"] = 0.0;
-                        _sensorData.Values["Swap Total (GB)"] = 0.0;
-                        _sensorData.Values["Swap Used (GB)"] = 0.0;
-                        _sensorData.Values["Swap Free (GB)"] = 0.0;
+                        _sensorData.Values["Swap Utilization (%)"] = 0.0f;
+                        _sensorData.Values["Swap Total (GB)"] = 0.0f;
+                        _sensorData.Values["Swap Used (GB)"] = 0.0f;
+                        _sensorData.Values["Swap Free (GB)"] = 0.0f;
                     }
                 }
                 catch (Exception ex)
@@ -105,14 +105,14 @@ namespace HwMonLinux
             }
             else
             {
-                _sensorData.Values["Memory Utilization (%)"] = 0.0;
-                _sensorData.Values["Memory Total (GB)"] = 0.0;
-                _sensorData.Values["Memory Used (GB)"] = 0.0;
-                _sensorData.Values["Memory Free (GB)"] = 0.0;
-                _sensorData.Values["Swap Utilization (%)"] = 0.0;
-                _sensorData.Values["Swap Total (GB)"] = 0.0;
-                _sensorData.Values["Swap Used (GB)"] = 0.0;
-                _sensorData.Values["Swap Free (GB)"] = 0.0;
+                _sensorData.Values["Memory Utilization (%)"] = 0.0f;
+                _sensorData.Values["Memory Total (GB)"] = 0.0f;
+                _sensorData.Values["Memory Used (GB)"] = 0.0f;
+                _sensorData.Values["Memory Free (GB)"] = 0.0f;
+                _sensorData.Values["Swap Utilization (%)"] = 0.0f;
+                _sensorData.Values["Swap Total (GB)"] = 0.0f;
+                _sensorData.Values["Swap Used (GB)"] = 0.0f;
+                _sensorData.Values["Swap Free (GB)"] = 0.0f;
                 Console.WriteLine("Memory utilization on non-Unix systems requires platform-specific implementation.");
             }
 

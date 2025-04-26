@@ -60,7 +60,7 @@ namespace HwMonLinux
                                     if (totalDifference.TotalMilliseconds > 0)
                                     {
                                         double cpuUsage = 1.0 - (idleDifference.TotalMilliseconds / totalDifference.TotalMilliseconds);
-                                        _sensorData.Values["Overall Utilization (%)"] = Math.Round(cpuUsage * 100, 2);
+                                        _sensorData.Values["Overall Utilization (%)"] = (float)Math.Round(cpuUsage * 100, 2);
                                     }
                                 }
 
@@ -92,7 +92,7 @@ namespace HwMonLinux
                                     if (timeDiff.TotalMilliseconds > 0 && totalDiff > 0)
                                     {
                                         double coreUsage = 1.0 - (double)idleDiff / totalDiff;
-                                        _sensorData.Values[$"Core {coreId} Utilization (%)"] = Math.Round(coreUsage * 100, 2);
+                                        _sensorData.Values[$"Core {coreId} Utilization (%)"] = (float)Math.Round(coreUsage * 100, 2);
                                     }
                                 }
 
@@ -109,7 +109,7 @@ namespace HwMonLinux
             }
             else
             {
-                _sensorData.Values["Overall Utilization (%)"] = 0.0;
+                _sensorData.Values["Overall Utilization (%)"] = 0.0f;
                 Console.WriteLine("CPU Utilization on non-Unix systems requires platform-specific implementation for accurate historical comparison.");
             }
 

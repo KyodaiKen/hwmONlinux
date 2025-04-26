@@ -37,13 +37,13 @@ namespace HwMonLinux
             { "VECS %", "GPU Video Prostproc Utilization (%)" }
             // Add mappings for 'se' and 'wa' if you want to expose them
         };
-        private readonly Dictionary<string, object> _sensorValues;
+        private readonly Dictionary<string, float> _sensorValues;
         private bool _headersRead = false;
 
         public IntelGpuSensorDataProvider(string friendlyName)
         {
             FriendlyName = friendlyName;
-            _sensorValues = new Dictionary<string, object>();
+            _sensorValues = [];
             _currentSensorData = new SensorData { Values = _sensorValues }; // Use the pre-allocated dictionary
             _outputBuffer = new byte[4096]; // Initial buffer size
             StartIntelGpuTop();
@@ -151,7 +151,6 @@ namespace HwMonLinux
                                 }
                             }
                             _headersRead = true;
-                            lines = lines.Skip(1).ToArray(); // Skip the header line for data processing
                         }
                         else if (headerLine != null)
                         {
@@ -163,23 +162,19 @@ namespace HwMonLinux
                     if (_headersRead && lines.Length > 0)
                     {
                         _sensorValues.Clear();
-                        string lastLine = lines.LastOrDefault();
-                        if (lastLine != null)
+                        string[] values = lines.LastOrDefault().Split(_csvSeparators, StringSplitOptions.TrimEntries);
+
+                        foreach (var kvp in _dynamicHeaderMap)
                         {
-                            string[] values = lastLine.Split(_csvSeparators, StringSplitOptions.TrimEntries);
+                            int index = kvp.Key;
+                            string header = kvp.Value;
 
-                            foreach (var kvp in _dynamicHeaderMap)
+                            if (index < values.Length)
                             {
-                                int index = kvp.Key;
-                                string header = kvp.Value;
-
-                                if (index < values.Length)
+                                if (_headerMapping.TryGetValue(header, out string mappedName) &&
+                                    float.TryParse(values[index], NumberStyles.Float, CultureInfo.InvariantCulture, out float value))
                                 {
-                                    if (_headerMapping.TryGetValue(header, out string mappedName) &&
-                                        double.TryParse(values[index], NumberStyles.Float, CultureInfo.InvariantCulture, out double value))
-                                    {
-                                        _sensorValues[mappedName] = value;
-                                    }
+                                    _sensorValues[mappedName] = value;
                                 }
                             }
                         }

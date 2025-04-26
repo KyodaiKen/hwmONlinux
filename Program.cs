@@ -23,12 +23,15 @@ namespace HwMonLinux
 
             // Create a list of sensor data providers by loading from config
             var sensorDataProviders = new List<ISensorDataProvider>();
-            foreach (var providerDef in config.SensorProviders)
+            if (config.SensorProviders != null)
             {
-                ISensorDataProvider provider = LoadSensorProvider(providerDef);
-                if (provider != null)
+                foreach (var providerDef in config.SensorProviders)
                 {
-                    sensorDataProviders.Add(provider);
+                    ISensorDataProvider provider = LoadSensorProvider(providerDef);
+                    if (provider != null)
+                    {
+                        sensorDataProviders.Add(provider);
+                    }
                 }
             }
 

@@ -7,6 +7,6 @@ namespace HwMonLinux
     public class SensorData
     {
         public DateTime Timestamp { get; set; } = DateTime.UtcNow;
-        public Dictionary<string, object> Values { get; set; } = new Dictionary<string, object>();
+        public Dictionary<string, float> Values { get; set; } = [];
     }
 }

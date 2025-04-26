@@ -46,7 +46,7 @@ namespace HwMonLinux
                     if (double.TryParse(powerString, NumberStyles.Float, CultureInfo.InvariantCulture, out double currentPowerMicroWatts))
                     {
                         double currentPowerWatts = currentPowerMicroWatts / 1_000_000.0;
-                        _sensorData.Values ["Package Power (W)"] = currentPowerWatts;
+                        _sensorData.Values ["Package Power (W)"] = (float)currentPowerWatts;
                     }
                     else
                     {
@@ -129,7 +129,7 @@ namespace HwMonLinux
                                 }
                             }
                         }
-                        _sensorData.Values[sensorName] = Math.Round(temperatureCelsius, 1);
+                        _sensorData.Values[sensorName] = (float)Math.Round(temperatureCelsius, 1);
                     }
                     else
                     {
