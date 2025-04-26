@@ -8,10 +8,12 @@ namespace HwMonLinux
     public class InMemorySensorDataStore
     {
         private readonly int _retentionSeconds;
-        private readonly ConcurrentDictionary<string, ConcurrentQueue<ReusableSensorData>> _sensorDataQueues = new ConcurrentDictionary<string, ConcurrentQueue<ReusableSensorData>>();
-        private readonly ConcurrentBag<ReusableSensorData> _sensorDataPool = new ConcurrentBag<ReusableSensorData>();
+        private readonly ConcurrentDictionary<string, ConcurrentQueue<ReusableSensorData>> _sensorDataQueues = [];
+        private readonly ConcurrentBag<ReusableSensorData> _sensorDataPool = [];
 
-        private readonly ConcurrentBag<Dictionary<string, object>> _valueDictionaryPool = new ConcurrentBag<Dictionary<string, object>>();
+        private Dictionary<string, object> _values;
+
+        private readonly ConcurrentBag<Dictionary<string, object>> _valueDictionaryPool = [];
 
         public InMemorySensorDataStore(int retentionSeconds)
         {
@@ -22,32 +24,23 @@ namespace HwMonLinux
         {
             if (!_sensorDataQueues.TryGetValue(sensorIdentifier, out var queue))
             {
-                _sensorDataQueues.TryAdd(sensorIdentifier, new ConcurrentQueue<ReusableSensorData>());
+                _sensorDataQueues.TryAdd(sensorIdentifier, []);
             }
 
             ReusableSensorData reusableData = _sensorDataPool.TryTake(out var pooledData) ? pooledData : new ReusableSensorData();
-            Dictionary<string, object> values = _valueDictionaryPool.TryTake(out var pooledDictionary) ? pooledDictionary : new Dictionary<string, object>();
+            _values = _valueDictionaryPool.TryTake(out var pooledDictionary) ? pooledDictionary : [];
 
-            values.Clear();
+            _values.Clear();
             foreach (var kvp in data.Values)
             {
-                values[kvp.Key] = kvp.Value;
+                _values[kvp.Key] = kvp.Value;
             }
 
             reusableData.Timestamp = data.Timestamp;
-            reusableData.Values = values;
+            reusableData.Values = _values;
 
             _sensorDataQueues[sensorIdentifier].Enqueue(reusableData);
             CleanupOldData(sensorIdentifier);
-        }
-
-        public SensorData? GetLatest(string sensorIdentifier)
-        {
-            if (_sensorDataQueues.TryGetValue(sensorIdentifier, out var queue) && queue.LastOrDefault() != null)
-            {
-                return queue.LastOrDefault();
-            }
-            return null;
         }
 
         public IEnumerable<SensorData> GetAll(string sensorIdentifier)

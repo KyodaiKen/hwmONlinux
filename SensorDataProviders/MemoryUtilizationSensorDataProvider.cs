@@ -16,19 +16,19 @@ namespace HwMonLinux
         public MemoryUtilizationSensorDataProvider(string friendlyName)
         {
             FriendlyName = friendlyName;
+            _sensorData = new();
+            _sensorData.Values = new();
         }
 
         public SensorData GetSensorData()
         {
-            _sensorData ??= new();
-            _sensorData.Values ??= new();
-
             if (Environment.OSVersion.Platform == PlatformID.Unix)
             {
                 try
                 {
                     string memInfo = File.ReadAllText("/proc/meminfo");
                     string[] lines = memInfo.Split('\n', StringSplitOptions.RemoveEmptyEntries);
+                    memInfo = "";
                     long totalMemoryKb = 0;
                     long freeMemoryKb = 0;
                     long availableMemoryKb = 0;

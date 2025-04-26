@@ -23,7 +23,10 @@ namespace HwMonLinux
         public DiskIoSensorDataProvider(string friendlyName, Dictionary<string, string> sensorNameOverrides = null)
         {
             FriendlyName = friendlyName;
-            _sensorNameOverrides = sensorNameOverrides ?? new Dictionary<string, string>();
+            _sensorNameOverrides = sensorNameOverrides ?? new();
+            _currentStats = new();
+            _sensorData = new();
+            _sensorData.Values = new();
             _mountPoints = GetMonitoredMountPoints();
         }
 
@@ -54,8 +57,6 @@ namespace HwMonLinux
 
         public SensorData GetSensorData()
         {
-            _sensorData ??= new();
-            _sensorData.Values ??= new();
             ReadDiskStats();
             var now = DateTime.UtcNow;
 
@@ -107,7 +108,6 @@ namespace HwMonLinux
 
         private void ReadDiskStats()
         {
-            _currentStats ??= new();
             try
             {
                 var procDiskStats = File.ReadAllLines("/proc/diskstats");
@@ -126,6 +126,7 @@ namespace HwMonLinux
                         }
                     }
                 }
+                procDiskStats = [];
             }
             catch (Exception ex)
             {

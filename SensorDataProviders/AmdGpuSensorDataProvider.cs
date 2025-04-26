@@ -16,12 +16,12 @@ namespace HwMonLinux
         public AmdGpuSensorDataProvider(string friendlyName)
         {
             FriendlyName = friendlyName;
+            _sensorData = new();
+            _sensorData.Values = new();
         }
 
         public SensorData GetSensorData()
         {
-            _sensorData ??= new();
-            _sensorData.Values ??= new();
 
             try
             {

@@ -26,13 +26,13 @@ namespace HwMonLinux
             {
                 Console.WriteLine($"Warning: Energy statistics file not found at '{_energyFilePath}'. This provider might not function.");
             }
+
+            _sensorData = new();
+            _sensorData.Values = new();
         }
 
         public SensorData GetSensorData()
         {
-            _sensorData ??= new();
-            _sensorData.Values ??= new();
-
             try
             {
                 if (File.Exists(_energyFilePath))

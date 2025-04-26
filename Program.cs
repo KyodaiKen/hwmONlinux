@@ -21,9 +21,6 @@ namespace HwMonLinux
             // Create a folder for the static web server files
             Directory.CreateDirectory(config.WebServer.ContentRoot);
 
-            // Create the sensor data store
-            var sensorDataStore = new InMemorySensorDataStore(config.SensorData.DataRetentionSeconds);
-
             // Create a list of sensor data providers by loading from config
             var sensorDataProviders = new List<ISensorDataProvider>();
             foreach (var providerDef in config.SensorProviders)
@@ -35,15 +32,8 @@ namespace HwMonLinux
                 }
             }
 
-            // Create a dictionary to hold grouped sensor data
-            /*var groupedSensorData = new Dictionary<string, OrderedDictionary>();
-            foreach (var groupDef in config.SensorGroups)
-            {
-                groupedSensorData[groupDef.Name] = new OrderedDictionary();
-            }*/
-
             // Create and start web server
-            var webServer = new WebServer(config.WebServer.Host, config.WebServer.Port, config.WebServer.ContentRoot, sensorDataStore, sensorDataProviders, new Dictionary<string, OrderedDictionary>(), config.SensorGroups); // Pass grouped data and group definitions
+            var webServer = new WebServer(config.WebServer.Host, config.WebServer.Port, config.WebServer.ContentRoot, config.SensorData.DataRetentionSeconds, sensorDataProviders, config.SensorGroups);
             await webServer.StartAsync();
 
             Console.WriteLine("Press any key to stop the server.");

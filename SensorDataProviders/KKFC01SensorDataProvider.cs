@@ -47,6 +47,9 @@ namespace HwMonLinux
             {
                 Console.WriteLine($"Error connecting to serial port {_portName}.");
             }
+
+            _sensorData = new();
+            _sensorData.Values = new();
         }
 
         private bool Connect()
@@ -117,8 +120,6 @@ namespace HwMonLinux
                         _unpackedData[i] = BitConverter.ToSingle(_receivedBuffer, i * _floatSize);
                     }
 
-                    _sensorData ??= new();
-                    _sensorData.Values ??= new();
                     _sensorData.Values["Water Temperature (°C)"] = _unpackedData[0];
                     _sensorData.Values["Case Temperature (°C)"] = _unpackedData[1];
                     _sensorData.Values["Ambient Temperature (°C)"] = _unpackedData[2];

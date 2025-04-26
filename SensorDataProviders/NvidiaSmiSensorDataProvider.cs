@@ -17,7 +17,7 @@ namespace HwMonLinux
 
         // A list of all possible nvidia-smi query options (as of a certain point).
         // This list might need to be updated with newer driver versions.
-        private static readonly List<string> AllNvidiaSmiMetrics = new List<string> {
+        private static readonly List<string> AllNvidiaSmiMetrics = [
             "timestamp",
             "name",
             "pci.bus_id",
@@ -71,16 +71,12 @@ namespace HwMonLinux
             "persistence_mode",
             "gpu_virtualization_mode",
             "total_cuda_cores",
-            "gpu_util", // Alias for utilization.gpu
-            "mem_util", // Alias for utilization.memory
-            "encoder.util", // Alias for utilization.encoder
-            "decoder.util", // Alias for utilization.decoder
             "ofa.util",
             "bar1.total",
             "bar1.free",
             "bar1.used"
             // Add other metrics as needed based on nvidia-smi --help-query-gpu
-        };
+        ];
 
         public NvidiaSmiSensorDataProvider(string friendlyName, List<string> queriedSensors = null, Dictionary<string, string> sensorNameOverrides = null)
         {
@@ -88,17 +84,17 @@ namespace HwMonLinux
             _queriedSensors = queriedSensors?.Where(s => AllNvidiaSmiMetrics.Contains(s)).ToList() ?? new List<string> {
                 "name", "temperature.gpu", "utilization.gpu", "memory.used", "power.draw"
             };
-            _sensorNameOverrides = sensorNameOverrides ?? new Dictionary<string, string>();
+            _sensorNameOverrides = sensorNameOverrides ?? new();
+            _sensorData ??= new();
+            _sensorData.Values ??= new();
         }
 
         public SensorData GetSensorData()
         {
-            _sensorData ??= new();
-            _sensorData.Values ??= new();
-
             try
             {
                 string queryArguments = $"--query-gpu={string.Join(",", _queriedSensors)} --format=csv,noheader,nounits";
+                string output;
                 using (var process = new Process())
                 {
                     process.StartInfo.FileName = "nvidia-smi";
@@ -108,35 +104,35 @@ namespace HwMonLinux
                     process.StartInfo.CreateNoWindow = true;
 
                     process.Start();
-                    string output = process.StandardOutput.ReadToEnd();
+                    output = process.StandardOutput.ReadToEnd();
                     process.WaitForExit();
+                }
 
-                    var lines = output.Trim().Split('\n');
-                    
-                    for (int i = 0; i < lines.Length; i++)
+                var lines = output.Trim().Split('\n');
+                
+                for (int i = 0; i < lines.Length; i++)
+                {
+                    var values = lines[i].Split(',').Select(v => v.Trim()).ToList();
+                    for (int j = 0; j < _queriedSensors.Count && j < values.Count; j++)
                     {
-                        var values = lines[i].Split(',').Select(v => v.Trim()).ToList();
+                        string rawSensorName = _queriedSensors[j];
+                        string friendlySensorName = _sensorNameOverrides.ContainsKey(rawSensorName) ? _sensorNameOverrides[rawSensorName] : rawSensorName;
+                        string fullSensorNameWithUnit = friendlySensorName;
 
-                        for (int j = 0; j < _queriedSensors.Count && j < values.Count; j++)
+                        if (float.TryParse(values[j], NumberStyles.Float, CultureInfo.InvariantCulture, out float floatValue))
                         {
-                            string rawSensorName = _queriedSensors[j];
-                            string friendlySensorName = _sensorNameOverrides.ContainsKey(rawSensorName) ? _sensorNameOverrides[rawSensorName] : rawSensorName;
-                            string fullSensorNameWithUnit = friendlySensorName;
-
-                            if (float.TryParse(values[j], NumberStyles.Float, CultureInfo.InvariantCulture, out float floatValue))
-                            {
-                                _sensorData.Values[fullSensorNameWithUnit] = floatValue;
-                            }
-                            else if (int.TryParse(values[j], NumberStyles.Integer, CultureInfo.InvariantCulture, out int intValue))
-                            {
-                                _sensorData.Values[fullSensorNameWithUnit] = intValue;
-                            }
-                            else
-                            {
-                                _sensorData.Values[fullSensorNameWithUnit] = values[j];
-                            }
+                            _sensorData.Values[fullSensorNameWithUnit] = floatValue;
+                        }
+                        else if (int.TryParse(values[j], NumberStyles.Integer, CultureInfo.InvariantCulture, out int intValue))
+                        {
+                            _sensorData.Values[fullSensorNameWithUnit] = intValue;
+                        }
+                        else
+                        {
+                            _sensorData.Values[fullSensorNameWithUnit] = values[j];
                         }
                     }
+                    values = [];
                 }
                 return _sensorData;
             }

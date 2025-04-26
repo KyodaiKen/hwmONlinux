@@ -26,12 +26,13 @@ namespace HwMonLinux
             {
                 Console.WriteLine($"Warning: AMD CPU power statistics file not found matching '{_powerFilePath}'. This provider might not function.");
             }
+
+            _sensorData = new();
+            _sensorData.Values = new();
         }
 
         public SensorData GetSensorData()
         {
-            _sensorData ??= new();
-            _sensorData.Values ??= new();
 
             try
             {

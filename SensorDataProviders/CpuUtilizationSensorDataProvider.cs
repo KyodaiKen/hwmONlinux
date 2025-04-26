@@ -20,19 +20,19 @@ namespace HwMonLinux
         public CpuUtilizationSensorDataProvider(string friendlyName)
         {
             FriendlyName = friendlyName;
+            _sensorData = new();
+            _sensorData.Values = new();
         }
 
         public SensorData GetSensorData()
         {
-            _sensorData ??= new();
-            _sensorData.Values ??= new();
-
             if (Environment.OSVersion.Platform == PlatformID.Unix)
             {
                 try
                 {
                     string cpuStat = File.ReadAllText("/proc/stat");
                     string[] lines = cpuStat.Split('\n');
+                    cpuStat = "";
                     DateTime currentTime = DateTime.UtcNow;
 
                     foreach (string line in lines)
@@ -100,6 +100,7 @@ namespace HwMonLinux
                             }
                         }
                     }
+                    lines = [];
                 }
                 catch (Exception ex)
                 {

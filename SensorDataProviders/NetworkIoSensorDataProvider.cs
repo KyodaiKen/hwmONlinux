@@ -25,6 +25,8 @@ namespace HwMonLinux
             FriendlyName = friendlyName;
             _sensorNameOverrides = sensorNameOverrides ?? new Dictionary<string, string>();
             _networkInterfaces = GetActiveEthernetInterfaces();
+            _sensorData = new();
+            _sensorData.Values = new();
         }
 
         private List<string> GetActiveEthernetInterfaces()
@@ -41,6 +43,7 @@ namespace HwMonLinux
                         interfaces.Add(parts[0]);
                     }
                 }
+                procNetDev = [];
             }
             catch (Exception ex)
             {
@@ -52,8 +55,6 @@ namespace HwMonLinux
         public SensorData GetSensorData()
         {
             ReadNetworkStats();
-            _sensorData ??= new();
-            _sensorData.Values ??= new();
             var now = DateTime.UtcNow;
 
             foreach (var iface in _networkInterfaces)
@@ -118,6 +119,7 @@ namespace HwMonLinux
                         _networkStats[interfaceName] = (receivedBytes, transmittedBytes);
                     }
                 }
+                procNetDev = [];
             }
             catch (Exception ex)
             {

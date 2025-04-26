@@ -28,16 +28,16 @@ namespace HwMonLinux
         {
             FriendlyName = friendlyName;
             _filterRegex = string.IsNullOrEmpty(filterRegex) ? null : filterRegex;
-            _sensorNameOverrides = sensorNameOverrides ?? new Dictionary<string, string>();
+            _sensorNameOverrides = sensorNameOverrides ?? new();
+            _sensorData = new();
+            _sensorData.Values = new();
         }
 
         public SensorData GetSensorData()
-        {
-            _sensorData ??= new();
-            _sensorData.Values ??= new();
-            
+        {      
             try
             {
+                string output;
                 using (var process = new Process())
                 {
                     process.StartInfo.FileName = "sensors";
@@ -46,73 +46,73 @@ namespace HwMonLinux
                     process.StartInfo.CreateNoWindow = true;
 
                     process.Start();
-                    string output = process.StandardOutput.ReadToEnd();
+                    output = process.StandardOutput.ReadToEnd();
                     process.WaitForExit();
+                }
 
-                    using (var reader = new StringReader(output))
+                using (var reader = new StringReader(output))
+                {
+                    string line;
+                    string currentChip = null;
+
+                    while ((line = reader.ReadLine()) != null)
                     {
-                        string line;
-                        string currentChip = null;
+                        line = line.Trim();
 
-                        while ((line = reader.ReadLine()) != null)
+                        // Identify spd memory chip names (e.g., "spd5118-i2c-14-53")
+                        if (Regex.IsMatch(line, @"^spd\d+-[a-zA-Z0-9]+-\d+-\d+$"))
                         {
-                            line = line.Trim();
+                            currentChip = line;
+                            continue;
+                        }
 
-                            // Identify spd memory chip names (e.g., "spd5118-i2c-14-53")
-                            if (Regex.IsMatch(line, @"^spd\d+-[a-zA-Z0-9]+-\d+-\d+$"))
+                        // Identify other chip names (e.g., "acpitz-acpi-0")
+                        if (Regex.IsMatch(line, @"^[a-zA-Z0-9]+-[a-zA-Z0-9]+-\d+$"))
+                        {
+                            currentChip = line;
+                            continue;
+                        }
+
+                        // Identify sensor readings (e.g., "temp1:        +40.0°C  (crit = +90.0°C)")
+                        Match sensorMatch = Regex.Match(line, @"^(.+?):\s+([+-]?\d+\.?\d*).+");
+                        if (sensorMatch.Success)
+                        {
+                            string sensorNameRaw = sensorMatch.Groups[1].Value.Trim();
+                            string sensorValueRaw = sensorMatch.Groups[2].Value.Trim();
+                            string fullSensorNameRaw = currentChip != null ? $"{currentChip}-{sensorNameRaw}" : sensorNameRaw;
+                            string finalSensorName = fullSensorNameRaw;
+
+                            //Console.WriteLine(fullSensorNameRaw);
+                            // Apply filter if one is provided
+                            if (_filterRegex != null && !Regex.IsMatch(fullSensorNameRaw, _filterRegex))
                             {
-                                currentChip = line;
                                 continue;
                             }
 
-                            // Identify other chip names (e.g., "acpitz-acpi-0")
-                            if (Regex.IsMatch(line, @"^[a-zA-Z0-9]+-[a-zA-Z0-9]+-\d+$"))
+                            // Apply sensor name overrides
+                            if (_sensorNameOverrides.ContainsKey(fullSensorNameRaw))
                             {
-                                currentChip = line;
-                                continue;
+                                finalSensorName = _sensorNameOverrides[fullSensorNameRaw];
+                            }
+                            else if (_sensorNameOverrides.ContainsKey(sensorNameRaw))
+                            {
+                                finalSensorName = _sensorNameOverrides[sensorNameRaw];
                             }
 
-                            // Identify sensor readings (e.g., "temp1:        +40.0°C  (crit = +90.0°C)")
-                            Match sensorMatch = Regex.Match(line, @"^(.+?):\s+([+-]?\d+\.?\d*).+");
-                            if (sensorMatch.Success)
+                            if (float.TryParse(sensorValueRaw, NumberStyles.Float, CultureInfo.InvariantCulture, out float sensorValue))
                             {
-                                string sensorNameRaw = sensorMatch.Groups[1].Value.Trim();
-                                string sensorValueRaw = sensorMatch.Groups[2].Value.Trim();
-                                string fullSensorNameRaw = currentChip != null ? $"{currentChip}-{sensorNameRaw}" : sensorNameRaw;
-                                string finalSensorName = fullSensorNameRaw;
-
-                                //Console.WriteLine(fullSensorNameRaw);
-                                // Apply filter if one is provided
-                                if (_filterRegex != null && !Regex.IsMatch(fullSensorNameRaw, _filterRegex))
-                                {
-                                    continue;
-                                }
-
-                                // Apply sensor name overrides
-                                if (_sensorNameOverrides.ContainsKey(fullSensorNameRaw))
-                                {
-                                    finalSensorName = _sensorNameOverrides[fullSensorNameRaw];
-                                }
-                                else if (_sensorNameOverrides.ContainsKey(sensorNameRaw))
-                                {
-                                    finalSensorName = _sensorNameOverrides[sensorNameRaw];
-                                }
-
-                                if (float.TryParse(sensorValueRaw, NumberStyles.Float, CultureInfo.InvariantCulture, out float sensorValue))
-                                {
-                                    _sensorData.Values[finalSensorName] = sensorValue;
-                                }
-                                else if (sensorValueRaw.ToLowerInvariant() == "n/a")
-                                {
-                                    _sensorData.Values[finalSensorName] = null; // Or some other indicator for N/A
-                                }
-                                // You might want to handle other units or states differently
+                                _sensorData.Values[finalSensorName] = sensorValue;
                             }
+                            else if (sensorValueRaw.ToLowerInvariant() == "n/a")
+                            {
+                                _sensorData.Values[finalSensorName] = null; // Or some other indicator for N/A
+                            }
+                            // You might want to handle other units or states differently
                         }
                     }
-
-                    return _sensorData;
                 }
+
+                return _sensorData;
             }
             catch (Exception ex)
             {
