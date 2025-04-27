@@ -11,7 +11,7 @@
     <SelfContained>false</SelfContained>
     <PublishDir>bin/Release/net8.0/linux-x64/publish/</PublishDir>
     <AssemblyName>HwmONlinuxServer</AssemblyName>
-    <PublishReadyToRun>true</PublishReadyToRun>
+    <PublishReadyToRun>false</PublishReadyToRun>
     </PropertyGroup>
 
   <ItemGroup>

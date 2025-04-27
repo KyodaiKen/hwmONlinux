@@ -1,97 +1,80 @@
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
-using System.Linq;
 
 namespace HwMonLinux
 {
     public class InMemorySensorDataStore
     {
         private readonly int _retentionSeconds;
-        private readonly ConcurrentDictionary<string, ConcurrentQueue<ReusableSensorData>> _sensorDataQueues = new();
-        private readonly ConcurrentBag<ReusableSensorData> _sensorDataPool = new();
-        private readonly ConcurrentBag<Dictionary<string, float>> _valueDictionaryPool = [];
+        // Provider -> SensorName -> List of (Timestamp, Value)
+        private readonly ConcurrentDictionary<string, ConcurrentDictionary<string, ConcurrentQueue<(DateTime Timestamp, object Value)>>> _sensorDataByProviderAndSensor;
 
         public InMemorySensorDataStore(int retentionSeconds)
         {
             _retentionSeconds = retentionSeconds;
+            _sensorDataByProviderAndSensor = new ConcurrentDictionary<string, ConcurrentDictionary<string, ConcurrentQueue<(DateTime Timestamp, object Value)>>>();
         }
 
-        public void Store(string sensorIdentifier, SensorData data)
+        public void Store(string providerName, SensorData rawData)
         {
-            if (!_sensorDataQueues.TryGetValue(sensorIdentifier, out var queue))
+            if (rawData?.Values == null) return;
+
+            var providerStore = _sensorDataByProviderAndSensor.GetOrAdd(providerName, _ => new ConcurrentDictionary<string, ConcurrentQueue<(DateTime Timestamp, object Value)>>());
+            var timestamp = rawData.Timestamp;
+
+            foreach (var kvp in rawData.Values)
             {
-                _sensorDataQueues.TryAdd(sensorIdentifier, new ConcurrentQueue<ReusableSensorData>());
-            }
+                var sensorName = kvp.Key;
+                var value = kvp.Value;
+                var queue = providerStore.GetOrAdd(sensorName, _ => new ConcurrentQueue<(DateTime Timestamp, object Value)>());
+                queue.Enqueue((timestamp, value));
 
-            ReusableSensorData reusableData = _sensorDataPool.TryTake(out var pooledData) ? pooledData : new ReusableSensorData();
-            Dictionary<string, float> values = _valueDictionaryPool.TryTake(out var pooledDictionary) ? pooledDictionary : new Dictionary<string, float>();
-
-            values.Clear();
-            foreach (var kvp in data.Values)
-            {
-                values[kvp.Key] = kvp.Value;
-            }
-
-            reusableData.Timestamp = data.Timestamp;
-            reusableData.Values = values;
-
-            _sensorDataQueues[sensorIdentifier].Enqueue(reusableData);
-            CleanupOldData(sensorIdentifier);
-        }
-
-        public SensorData? GetLatest(string sensorIdentifier)
-        {
-            if (_sensorDataQueues.TryGetValue(sensorIdentifier, out var queue) && queue.LastOrDefault() != null)
-            {
-                return queue.LastOrDefault();
-            }
-            return null;
-        }
-
-        public IEnumerable<SensorData> GetAll(string sensorIdentifier)
-        {
-            if (_sensorDataQueues.TryGetValue(sensorIdentifier, out var queue))
-            {
-                return queue.ToList();
-            }
-            return Enumerable.Empty<SensorData>();
-        }
-
-    private void CleanupOldData(string sensorIdentifier)
-    {
-        if (_sensorDataQueues.TryGetValue(sensorIdentifier, out var queue))
-        {
-            DateTime cutoff = DateTime.UtcNow.AddSeconds(-_retentionSeconds);
-            //Console.WriteLine($"[{DateTime.Now}][Cleanup - {sensorIdentifier}] Cutoff: {cutoff:O}, Queue Size: {queue.Count}");
-            ReusableSensorData oldest;
-            int removedCount = 0;
-            while (queue.TryPeek(out oldest) && oldest.Timestamp < cutoff)
-            {
-                if (queue.TryDequeue(out var toReturn))
+                // Clean up old data
+                var cutoff = DateTime.UtcNow.AddSeconds(-_retentionSeconds);
+                var itemsToRemove = new List<(DateTime Timestamp, object Value)>();
+                foreach (var item in queue)
                 {
-                    //Console.WriteLine($"[{DateTime.Now}][Cleanup - {sensorIdentifier}] Removed: {toReturn.Timestamp:O}");
-                    if (toReturn.Values != null)
+                    if (item.Timestamp < cutoff)
                     {
-                        _valueDictionaryPool.Add(toReturn.Values);
-                        toReturn.Values = null;
+                        itemsToRemove.Add(item);
                     }
-                    _sensorDataPool.Add(toReturn);
-                    removedCount++;
+                    else
+                    {
+                        // Since items are added in increasing timestamp order,
+                        // once we hit a recent item, we can stop checking.
+                        break;
+                    }
                 }
-                else
+
+                // Dequeue the old items
+                foreach (var _ in itemsToRemove)
                 {
-                    //Console.WriteLine($"[{DateTime.Now}][Cleanup - {sensorIdentifier}] Dequeue failed for: {oldest?.Timestamp:O}");
-                    break; // Avoid potential infinite loop
+                    (DateTime Timestamp, object Value) dequeuedItem; // Declare a variable for out
+                    queue.TryDequeue(out dequeuedItem);
+                }
+                itemsToRemove = null;
+            }
+        }
+
+        public Dictionary<string, List<(DateTime Timestamp, object Value)>> GetAllGroupedBySensor(string providerName)
+        {
+            var result = new Dictionary<string, List<(DateTime Timestamp, object Value)>>();
+            if (_sensorDataByProviderAndSensor.TryGetValue(providerName, out var providerStore))
+            {
+                foreach (var kvp in providerStore)
+                {
+                    var queue = kvp.Value;
+                    var list = new List<(DateTime Timestamp, object Value)>(queue.Count);
+                    foreach (var item in queue)
+                    {
+                        list.Add(item);
+                    }
+                    list.Sort((a, b) => a.Timestamp.CompareTo(b.Timestamp));
+                    result[kvp.Key] = list;
                 }
             }
-            //Console.WriteLine($"[{DateTime.Now}][Cleanup - {sensorIdentifier}] Removed {removedCount} items. New Queue Size: {queue.Count}");
-        }
-    }
-
-        private class ReusableSensorData : SensorData
-        {
-            // Inherits Timestamp and Values
+            return result;
         }
     }
 }

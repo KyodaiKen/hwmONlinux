@@ -132,90 +132,69 @@ namespace HwMonLinux
             }
         }
 
-    private async Task HandleAllSensorsDataRequestAsync(HttpListenerContext context)
-    {
-        var response = context.Response;
-        response.ContentType = "application/json";
-        response.StatusCode = (int)HttpStatusCode.OK;
-
-        if (_sensorDataProviders.Count == 0) {
-            response.StatusCode = (int)HttpStatusCode.InternalServerError;
-            return;
-        }
-
-        _bufferWriter.Clear();
-        using (_jsonWriter = new Utf8JsonWriter(_bufferWriter))
+        private async Task HandleAllSensorsDataRequestAsync(HttpListenerContext context)
         {
-            _jsonWriter.WriteStartObject();
-            _jsonWriter.WritePropertyName("providers");
-            _jsonWriter.WriteStartObject(); // Start of the providers object
-            foreach (var provider in _sensorDataProviders)
+            var response = context.Response;
+            response.ContentType = "application/json";
+            response.StatusCode = (int)HttpStatusCode.OK;
+
+            if (_sensorDataProviders.Count == 0)
             {
-                _jsonWriter.WritePropertyName(provider.FriendlyName); // Provider Friendly Name
-                _jsonWriter.WriteStartObject(); // Start of the sensor data for the provider
+                response.StatusCode = (int)HttpStatusCode.InternalServerError;
+                return;
+            }
 
-                Dictionary<string, List<SensorData>> sensorDataBySensorName = _sensorDataByNameCache.Value!;
-                sensorDataBySensorName.Clear();
-
-                var allData = _sensorDataStore.GetAll(provider.Name);
-                if (allData != null)
+            _bufferWriter.Clear();
+            using (_jsonWriter = new Utf8JsonWriter(_bufferWriter))
+            {
+                _jsonWriter.WriteStartObject();
+                _jsonWriter.WritePropertyName("providers");
+                _jsonWriter.WriteStartObject(); // Start of the providers object
+                foreach (var provider in _sensorDataProviders)
                 {
-                    foreach (var sd in allData)
-                    {
-                        if (sd.Values != null)
-                        {
-                            foreach (var kvp in sd.Values)
-                            {
-                                if (!sensorDataBySensorName.TryGetValue(kvp.Key, out var list))
-                                {
-                                    list = new List<SensorData>();
-                                    sensorDataBySensorName[kvp.Key] = list;
-                                }
-                                list.Add(sd);
-                            }
-                        }
-                    }
+                    _jsonWriter.WritePropertyName(provider.FriendlyName); // Provider Friendly Name
+                    _jsonWriter.WriteStartObject(); // Start of the sensor data for the provider
 
-                    foreach (var sensorNameKvp in sensorDataBySensorName)
+                    var groupedDataBySensor = _sensorDataStore.GetAllGroupedBySensor(provider.Name);
+                    foreach (var sensorNameKvp in groupedDataBySensor)
                     {
                         _jsonWriter.WritePropertyName(sensorNameKvp.Key);
                         _jsonWriter.WriteStartArray();
-                        foreach (var dataPoint in sensorNameKvp.Value.OrderBy(d => d.Timestamp))
+                        foreach (var reading in sensorNameKvp.Value)
                         {
                             _jsonWriter.WriteStartObject();
-                            _jsonWriter.WriteString("Timestamp", dataPoint.Timestamp.ToString("O"));
+                            _jsonWriter.WriteString("Timestamp", reading.Timestamp.ToString("O"));
                             _jsonWriter.WritePropertyName("Value");
-                            JsonSerializer.Serialize(_jsonWriter, dataPoint.Values[sensorNameKvp.Key]); // Access Value from SensorData
+                            JsonSerializer.Serialize(_jsonWriter, reading.Value);
                             _jsonWriter.WriteEndObject();
                         }
                         _jsonWriter.WriteEndArray();
                     }
+
+                    _jsonWriter.WriteEndObject(); // End of the sensor data for the provider
                 }
+                _jsonWriter.WriteEndObject(); // End of the providers object
 
-                _jsonWriter.WriteEndObject(); // End of the sensor data for the provider
-            }
-            _jsonWriter.WriteEndObject(); // End of the providers object
+                _jsonWriter.WritePropertyName("sensorGroups");
+                _jsonWriter.WriteStartArray();
+                foreach (var g in _sensorGroups)
+                {
+                    _jsonWriter.WriteStartObject();
+                    _jsonWriter.WriteString("name", g.Name);
+                    _jsonWriter.WriteString("friendlyName", g.FriendlyName);
+                    _jsonWriter.WritePropertyName("sensorIdentifiers");
+                    JsonSerializer.Serialize(_jsonWriter, g.SensorIdentifiers);
+                    _jsonWriter.WriteEndObject();
+                }
+                _jsonWriter.WriteEndArray();
 
-            _jsonWriter.WritePropertyName("sensorGroups");
-            _jsonWriter.WriteStartArray();
-            foreach (var g in _sensorGroups)
-            {
-                _jsonWriter.WriteStartObject();
-                _jsonWriter.WriteString("name", g.Name);
-                _jsonWriter.WriteString("friendlyName", g.FriendlyName);
-                _jsonWriter.WritePropertyName("sensorIdentifiers");
-                JsonSerializer.Serialize(_jsonWriter, g.SensorIdentifiers);
                 _jsonWriter.WriteEndObject();
+                await _jsonWriter.FlushAsync();
+                byte[] buffer = _bufferWriter.WrittenSpan.ToArray();
+                response.ContentLength64 = buffer.Length;
+                await response.OutputStream.WriteAsync(buffer, 0, buffer.Length);
             }
-            _jsonWriter.WriteEndArray();
-
-            _jsonWriter.WriteEndObject();
-            await _jsonWriter.FlushAsync();
-            byte[] buffer = _bufferWriter.WrittenSpan.ToArray();
-            response.ContentLength64 = buffer.Length;
-            await response.OutputStream.WriteAsync(buffer, 0, buffer.Length);
         }
-    }
 
         private string GetContentType(string filename)
         {
@@ -258,6 +237,7 @@ namespace HwMonLinux
                         Console.WriteLine($"Error polling sensor '{provider.Name}': {ex.Message}");
                     }
                 }
+                GC.Collect();
 
                 sw.Stop();
                 int remainingDelayMs = Math.Max(0, (int)(1000 - sw.ElapsedMilliseconds));

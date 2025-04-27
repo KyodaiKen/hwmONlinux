@@ -225,7 +225,13 @@
                                     chart.update('none');
 
                                     // Update latest value
-                                    const latestValueDiv = chartDiv.querySelector('.latest-value');
+                                    let latestValueDiv = chartDiv.querySelector('.latest-value');
+                                    if (latestValueDiv == null) {
+                                        latestValueDiv = document.createElement('div');
+                                        latestValueDiv.classList.add('latest-value');
+                                        latestValueDiv.textContent = 'Current: N/A';
+                                        chartDiv.appendChild(latestValueDiv);
+                                    }
                                     if (latestValueDiv && dataPoints.length > 0) {
                                         const latestValueRaw = parseFloat(dataPoints[dataPoints.length - 1].y);
                                         const latestValueFormatted = (Number.isInteger(latestValueRaw) ? latestValueRaw : latestValueRaw.toFixed(2));
@@ -345,6 +351,7 @@
             } catch (error) {
                 console.error('Error fetching or processing data:', error);
                 document.querySelector('.container').innerHTML = `<p class="error-message">Failed to load sensor data. Error: ${error}</p>`;
+                initialLoadComplete = false;
                 hasError = true;
             }
         }
