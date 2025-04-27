@@ -1,4 +1,8 @@
+using System;
+using System.Collections.Generic;
 using System.Diagnostics;
+using System.IO;
+using System.Linq;
 using System.Net;
 using System.Text;
 using System.Text.Json;
@@ -13,7 +17,8 @@ namespace HwMonLinux
         private readonly InMemorySensorDataStore _sensorDataStore;
         private readonly List<ISensorDataProvider> _sensorDataProviders;
         private readonly List<SensorGroupDefinition> _sensorGroups;
-        private static readonly ThreadLocal<Dictionary<string, List<SensorData>>> _sensorDataByNameCache = new(() => new());
+        private readonly (string, (string, string)[])[] _sensorIndex; // Receive the sensor index (originalName, label)
+        private readonly Dictionary<string, Dictionary<string, string>> _sensorLabels; // ProviderName -> (OriginalName -> Label)
 
         private CancellationTokenSource _cts;
 
@@ -21,13 +26,15 @@ namespace HwMonLinux
         private readonly ArrayBufferWriter<byte> _bufferWriter = new();
         private Utf8JsonWriter _jsonWriter;
 
-        public WebServer(string host, int port, string contentRoot, int sensorRetentionSeconds, List<ISensorDataProvider> sensorDataProviders, List<SensorGroupDefinition> sensorGroups)
+        public WebServer(string host, int port, string contentRoot, int sensorRetentionSeconds, List<ISensorDataProvider> sensorDataProviders, List<SensorGroupDefinition> sensorGroups, (string, (string, string)[])[] sensorIndex, Dictionary<string, Dictionary<string, string>> sensorLabels)
         {
             _listener.Prefixes.Add($"http://{host}:{port}/");
             _contentRoot = contentRoot;
-            _sensorDataStore = new(sensorRetentionSeconds);
             _sensorDataProviders = sensorDataProviders;
             _sensorGroups = sensorGroups;
+            _sensorIndex = sensorIndex;
+            _sensorLabels = sensorLabels;
+            _sensorDataStore = new InMemorySensorDataStore(sensorRetentionSeconds, _sensorIndex.Select(p => (p.Item1, p.Item2.Select(l => l.Item1).ToArray())).ToArray()); // Initialize data store with original names
         }
 
         public async Task StartAsync()
@@ -102,7 +109,7 @@ namespace HwMonLinux
         {
             var request = context.Request;
             var response = context.Response;
-            
+
             string filename;
             if (request.Url.AbsolutePath == "/")
             {
@@ -138,39 +145,45 @@ namespace HwMonLinux
             response.ContentType = "application/json";
             response.StatusCode = (int)HttpStatusCode.OK;
 
-            if (_sensorDataProviders.Count == 0)
-            {
-                response.StatusCode = (int)HttpStatusCode.InternalServerError;
-                return;
-            }
-
             _bufferWriter.Clear();
             using (_jsonWriter = new Utf8JsonWriter(_bufferWriter))
             {
                 _jsonWriter.WriteStartObject();
                 _jsonWriter.WritePropertyName("providers");
                 _jsonWriter.WriteStartObject(); // Start of the providers object
-                foreach (var provider in _sensorDataProviders)
+
+                foreach (var providerInfo in _sensorIndex)
                 {
-                    _jsonWriter.WritePropertyName(provider.FriendlyName); // Provider Friendly Name
+                    var provider = _sensorDataProviders.FirstOrDefault(p => p.Name == providerInfo.Item1);
+                    _jsonWriter.WritePropertyName(providerInfo.Item1); // Original Provider Name (for matching with groups)
                     _jsonWriter.WriteStartObject(); // Start of the sensor data for the provider
 
-                    var groupedDataBySensor = _sensorDataStore.GetAllGroupedBySensor(provider.Name);
-                    foreach (var sensorNameKvp in groupedDataBySensor)
+                    if (_sensorDataStore.GetSensorDataFromProvider(providerInfo.Item1, out var providerData, out var counters))
                     {
-                        _jsonWriter.WritePropertyName(sensorNameKvp.Key);
-                        _jsonWriter.WriteStartArray();
-                        foreach (var reading in sensorNameKvp.Value)
+                        for (int s = 0; s < providerInfo.Item2.Length; s++)
                         {
-                            _jsonWriter.WriteStartObject();
-                            _jsonWriter.WriteString("Timestamp", reading.Timestamp.ToString("O"));
-                            _jsonWriter.WritePropertyName("Value");
-                            JsonSerializer.Serialize(_jsonWriter, reading.Value);
-                            _jsonWriter.WriteEndObject();
-                        }
-                        _jsonWriter.WriteEndArray();
-                    }
+                            string originalSensorName = providerInfo.Item2[s].Item1;
+                            string sensorLabel = providerInfo.Item2[s].Item2;
 
+                            _jsonWriter.WritePropertyName(originalSensorName); // Original Sensor Name
+                            _jsonWriter.WriteStartObject(); // Start of the sensor object
+                            _jsonWriter.WriteString("friendlyName", sensorLabel); // Add friendlyName for the sensor
+                            _jsonWriter.WritePropertyName("data");
+                            _jsonWriter.WriteStartArray(); // Start of the sensor data array
+
+                            int counter = counters[s]; // Get the current counter for this sensor directly
+
+                            for (int i = 0; i < counter; i++)
+                            {
+                                _jsonWriter.WriteStartObject();
+                                _jsonWriter.WriteString("Timestamp", providerData[s][i].Item1.ToString("O"));
+                                _jsonWriter.WriteNumber("Value", providerData[s][i].Item2);
+                                _jsonWriter.WriteEndObject();
+                            }
+                            _jsonWriter.WriteEndArray(); // End of the sensor data array
+                            _jsonWriter.WriteEndObject(); // End of the sensor object
+                        }
+                    }
                     _jsonWriter.WriteEndObject(); // End of the sensor data for the provider
                 }
                 _jsonWriter.WriteEndObject(); // End of the providers object
@@ -223,14 +236,18 @@ namespace HwMonLinux
                 {
                     try
                     {
-                        var data = provider.GetSensorData();
-                        if (data != null && data.Values != null)
+                        if (provider.GetSensorData(out var sensorData))
                         {
-                            data.Timestamp = DateTime.UtcNow;
-                            _sensorDataStore.Store(provider.Name, data); // Store in the history
-                            Console.WriteLine($"[{DateTime.Now}] Sensor '{provider.Name}': Gathered data.");
+                            if (sensorData != null && sensorData.Length > 0)
+                            {
+                                _sensorDataStore.StoreSensorDataFromProvider(provider.Name, sensorData);
+                                Console.WriteLine($"[{DateTime.Now}] Sensor '{provider.Name}': Gathered data for {sensorData.Length} sensors.");
+                            }
+                            else
+                            {
+                                Console.WriteLine($"[{DateTime.Now}] Sensor '{provider.Name}': No sensor data received.");
+                            }
                         }
-                        data = null;
                     }
                     catch (Exception ex)
                     {

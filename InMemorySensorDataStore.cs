@@ -1,80 +1,100 @@
-using System;
-using System.Collections.Concurrent;
-using System.Collections.Generic;
-
 namespace HwMonLinux
 {
     public class InMemorySensorDataStore
     {
+        // Parameters
         private readonly int _retentionSeconds;
-        // Provider -> SensorName -> List of (Timestamp, Value)
-        private readonly ConcurrentDictionary<string, ConcurrentDictionary<string, ConcurrentQueue<(DateTime Timestamp, object Value)>>> _sensorDataByProviderAndSensor;
+        private readonly (string, string[])[] _sensorIndex;
 
-        public InMemorySensorDataStore(int retentionSeconds)
+        // Sensor data
+        private readonly (DateTime, float)[][][] _data;
+        private readonly int[][] _counters;
+
+        public InMemorySensorDataStore(int retentionSeconds, (string, string[])[] sensorProvidersAndTheirSensors)
         {
             _retentionSeconds = retentionSeconds;
-            _sensorDataByProviderAndSensor = new ConcurrentDictionary<string, ConcurrentDictionary<string, ConcurrentQueue<(DateTime Timestamp, object Value)>>>();
-        }
+            _sensorIndex = sensorProvidersAndTheirSensors;
 
-        public void Store(string providerName, SensorData rawData)
-        {
-            if (rawData?.Values == null) return;
+            // Allocate memory for all providers and their exposed sensors
+            _data = new (DateTime, float)[_sensorIndex.Length][][];
+            _counters = new int[_sensorIndex.Length][];
 
-            var providerStore = _sensorDataByProviderAndSensor.GetOrAdd(providerName, _ => new ConcurrentDictionary<string, ConcurrentQueue<(DateTime Timestamp, object Value)>>());
-            var timestamp = rawData.Timestamp;
-
-            foreach (var kvp in rawData.Values)
+            // Initialize the providers
+            for (int p = 0; p < _sensorIndex.Length; p++)
             {
-                var sensorName = kvp.Key;
-                var value = kvp.Value;
-                var queue = providerStore.GetOrAdd(sensorName, _ => new ConcurrentQueue<(DateTime Timestamp, object Value)>());
-                queue.Enqueue((timestamp, value));
+                _data[p] = new (DateTime, float)[_sensorIndex[p].Item2.Length][];
+                _counters[p] = new int[_sensorIndex[p].Item2.Length];
 
-                // Clean up old data
-                var cutoff = DateTime.UtcNow.AddSeconds(-_retentionSeconds);
-                var itemsToRemove = new List<(DateTime Timestamp, object Value)>();
-                foreach (var item in queue)
+                // Initialize the provider's sensors
+                for (int s = 0; s < _sensorIndex[p].Item2.Length; s++)
                 {
-                    if (item.Timestamp < cutoff)
-                    {
-                        itemsToRemove.Add(item);
-                    }
-                    else
-                    {
-                        // Since items are added in increasing timestamp order,
-                        // once we hit a recent item, we can stop checking.
-                        break;
-                    }
+                    _data[p][s] = new (DateTime, float)[retentionSeconds];
+                    _counters[p][s] = 1;
                 }
-
-                // Dequeue the old items
-                foreach (var _ in itemsToRemove)
-                {
-                    (DateTime Timestamp, object Value) dequeuedItem; // Declare a variable for out
-                    queue.TryDequeue(out dequeuedItem);
-                }
-                itemsToRemove = null;
             }
         }
 
-        public Dictionary<string, List<(DateTime Timestamp, object Value)>> GetAllGroupedBySensor(string providerName)
+        public void StoreSensorDataFromProvider(string providerName, (string, float)[] providedData)
         {
-            var result = new Dictionary<string, List<(DateTime Timestamp, object Value)>>();
-            if (_sensorDataByProviderAndSensor.TryGetValue(providerName, out var providerStore))
+            for (int p = 0; p < _sensorIndex.Length; p++)
             {
-                foreach (var kvp in providerStore)
+                if (_sensorIndex[p].Item1 == providerName)
                 {
-                    var queue = kvp.Value;
-                    var list = new List<(DateTime Timestamp, object Value)>(queue.Count);
-                    foreach (var item in queue)
+                    for (int s = 0; s < _sensorIndex[p].Item2.Length; s++)
                     {
-                        list.Add(item);
+                        for (int ps = 0; ps < providedData.Length; ps++)
+                        {
+                            // if(_sensorIndex[p].Item2[s] == "eno1.tx")
+                            // {
+                            //     Console.WriteLine($"{_sensorIndex[p].Item2[s]} == {providedData[ps].Item1}");
+                            // }
+                            if (_sensorIndex[p].Item2[s] == providedData[ps].Item1)
+                            {
+                                if (_counters[p][s] == _retentionSeconds)
+                                {
+                                    // Shift array one to the left
+                                    for (int v = 1; v < _retentionSeconds; v++)
+                                    {
+                                        _data[p][s][v-1] = _data[p][s][v];
+                                    }
+                                }
+                                else
+                                {
+                                    // Just increment the counter
+                                    _counters[p][s]++;
+                                }
+
+                                // Set new values
+                                _data[p][s][_counters[p][s]-1].Item1 = DateTime.UtcNow;
+                                _data[p][s][_counters[p][s]-1].Item2 = providedData[s].Item2;
+
+                                //Console.WriteLine($"{providerName}.{_sensorIndex[p].Item2[s]}.Count = {_counters[p][s]}");
+
+                                break;
+                            }
+                        }
                     }
-                    list.Sort((a, b) => a.Timestamp.CompareTo(b.Timestamp));
-                    result[kvp.Key] = list;
                 }
             }
-            return result;
+        }
+
+        public bool GetSensorDataFromProvider(string providerName, out (DateTime, float)[][] data, out int[] counters)
+        {
+            // Find the sensor data for our provider and return it.
+            for (int i = 0; i < _sensorIndex.Length; i++)
+            {
+                if (_sensorIndex[i].Item1 == providerName)
+                {
+                    counters = _counters[i];
+                    data = _data[i];
+                    return true;
+                }
+            }
+
+            // Nothing has been found for given provider name
+            counters = [];
+            data = [];
+            return false;
         }
     }
 }

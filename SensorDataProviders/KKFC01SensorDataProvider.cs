@@ -19,16 +19,30 @@ namespace HwMonLinux
         private const string IdentificationQuery = "i";
         private const int SerialTimeoutMs = 1000;
 
-        public string Name => "KKFC01";
+        public string Name => "fan.controller.KKFC01";
         public string FriendlyName { get; }
+
+        private readonly List<string> _provideSensors;
+
+        private readonly string[] _sensorNames = [
+            "temp.water",
+            "temp.case",
+            "temp.ambient",
+            "matrix.radiator-fans",
+            "matrix.case-fans",
+            "matrix.unused",
+            "pwm.radiator-fans",
+            "pwm.case-fans",
+            "pwm.unused"
+        ];
 
         //Persistent memory to avoid reallocations
         private byte[] _receivedBuffer;
         private int _bytesRead;
         private float[] _unpackedData;
-        private SensorData _sensorData;
+        private (string, float)[] _sensorData;
 
-        public KKFC01SensorDataProvider(string friendlyName, string portName, int baudRate, string queryCommand, string identificationString)
+        public KKFC01SensorDataProvider(string friendlyName, string portName, int baudRate, string queryCommand, string identificationString, List<string> provideSensors)
         {
             FriendlyName = friendlyName;
             _portName = portName;
@@ -40,6 +54,8 @@ namespace HwMonLinux
             _serialPort.ReadTimeout = SerialTimeoutMs;
             _serialPort.WriteTimeout = SerialTimeoutMs;
 
+            _provideSensors = provideSensors;
+
             _receivedBuffer = new byte[_floatSize * _numEntries * 3];
             _unpackedData = new float[_numEntries * 3];
 
@@ -48,8 +64,7 @@ namespace HwMonLinux
                 Console.WriteLine($"Error connecting to serial port {_portName}.");
             }
 
-            _sensorData = new();
-            _sensorData.Values = new();
+            _sensorData = new (string, float)[_provideSensors.Count];
         }
 
         private bool Connect()
@@ -97,14 +112,15 @@ namespace HwMonLinux
             }
         }
 
-        public SensorData GetSensorData()
+        public bool GetSensorData(out (string, float)[] data)
         {
             if (_serialPort == null || !_serialPort.IsOpen)
             {
                 if (!Connect())
                 {
                     Console.WriteLine($"Serial connection to {_portName} is not active. Skipping data retrieval.");
-                    return null;
+                    data = [];
+                    return false;
                 }
             }
 
@@ -115,25 +131,26 @@ namespace HwMonLinux
 
                 if (_bytesRead == _receivedBuffer.Length)
                 {
+                    int si = 0;
                     for (int i = 0; i < _unpackedData.Length; i++)
                     {
-                        _unpackedData[i] = BitConverter.ToSingle(_receivedBuffer, i * _floatSize);
+                        if (_provideSensors.Contains(_sensorNames[i]))
+                        {
+                            _unpackedData[i] = BitConverter.ToSingle(_receivedBuffer, i * _floatSize);
+                            _sensorData[si].Item1 = _sensorNames[i];
+                            _sensorData[si].Item2 = _unpackedData[i];
+                            si++;
+                        }
                     }
 
-                    _sensorData.Values["Water Temperature (°C)"] = _unpackedData[0];
-                    _sensorData.Values["Case Temperature (°C)"] = _unpackedData[1];
-                    _sensorData.Values["Ambient Temperature (°C)"] = _unpackedData[2];
-                    _sensorData.Values["Water MV"] = _unpackedData[3];
-                    _sensorData.Values["Case MV"] = _unpackedData[5];
-                    _sensorData.Values["Radiator Fan Speed (%)"] = _unpackedData[6];
-                    _sensorData.Values["Case Fan Speed (%)"] = _unpackedData[8];
-
-                    return _sensorData;
+                    data = _sensorData;
+                    return true;
                 }
                 else
                 {
                     Console.WriteLine($"Error: Received bytes ({_bytesRead}) do not match the expected count ({_receivedBuffer.Length}).");
-                    return null;
+                    data = [];
+                    return false;
                 }
             }
             catch (Exception ex)
@@ -144,7 +161,8 @@ namespace HwMonLinux
                 {
                     _serialPort.Close();
                 }
-                return null;
+                data = [];
+                return false;
             }
         }
 
@@ -152,6 +170,9 @@ namespace HwMonLinux
         {
             if (_serialPort != null && _serialPort.IsOpen)
             {
+                _sensorData = [];
+                _unpackedData = [];
+                _receivedBuffer = [];
                 _serialPort.Close();
                 _serialPort.Dispose();
                 _serialPort = null;

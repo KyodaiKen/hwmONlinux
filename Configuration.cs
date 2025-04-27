@@ -1,5 +1,3 @@
-using System.Collections.Generic;
-using System.IO;
 using YamlDotNet.Serialization;
 using YamlDotNet.Serialization.NamingConventions;
 
@@ -8,15 +6,14 @@ namespace HwMonLinux
     public class SensorProviderDefinition
     {
         public required string Type { get; set; }
-        public required Dictionary<object, object> Config { get; set; }
-        public required List<string> PublishedSensors { get; set; } // Optional: List of specific sensors to publish
+        public required Dictionary<string, object> Config { get; set; }
     }
 
     public class SensorGroupDefinition
     {
         public required string Name { get; set; }
         public required string FriendlyName { get; set; }
-        public required List<string> SensorIdentifiers { get; set; } // Identifiers to match sensors from providers
+        public required List<string> SensorIdentifiers { get; set; }
     }
 
     public class WebServerConfig
@@ -36,7 +33,7 @@ namespace HwMonLinux
         public required WebServerConfig WebServer { get; set; }
         public required SensorDataConfig SensorData { get; set; }
         public required List<SensorProviderDefinition> SensorProviders { get; set; }
-        public required List<SensorGroupDefinition> SensorGroups { get; set; } // New property for sensor groups
+        public required List<SensorGroupDefinition> SensorGroups { get; set; }
 
         public static Configuration Load(string path)
         {

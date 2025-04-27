@@ -4,6 +4,6 @@ namespace HwMonLinux
     {
         string Name { get; }
         string FriendlyName { get; }
-        SensorData GetSensorData();
+        bool GetSensorData(out (string, float)[] data);
     }
 }

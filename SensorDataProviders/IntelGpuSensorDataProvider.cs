@@ -11,40 +11,28 @@ namespace HwMonLinux
 {
     public class IntelGpuSensorDataProvider : ISensorDataProvider, IDisposable
     {
-        public string Name => "IntelGpuTop";
+        public string Name => "gpu.intel_gpu_top";
         public string FriendlyName { get; }
+
+        private readonly List<string> _provideSensors;
 
         private Process _process;
         private StreamReader _outputReader;
         private byte[] _outputBuffer; // Let the buffer resize dynamically if needed
         private int _outputBufferLength = 0;
         private bool _disposed = false;
-        private SensorData _currentSensorData;
+        private (string, float)[] _sensorData;
         private static readonly char[] _lineSeparators = ['\n'];
         private static readonly char[] _csvSeparators = [','];
         private Dictionary<int, string> _dynamicHeaderMap = new Dictionary<int, string>();
-        private readonly Dictionary<string, string> _headerMapping = new Dictionary<string, string>()
-        {
-            { "Freq MHz req", "GPU Requested Frequency (MHz)" },
-            { "Freq MHz act", "GPU Frequency (MHz)" },
-            { "IRQ /s", "GPU IRQ Rate (/s)" },
-            { "RC6 %", "GPU RC6 Residency (%)" },
-            { "Power W gpu", "GPU Power (W)" },
-            { "Power W pkg", "GPU Package Power (W)" },
-            { "RCS %", "GPU Render/3D Utilization (%)" },
-            { "BCS %", "GPU Blitter Utilization (%)" },
-            { "VCS %", "GPU Video Engine Utilization (%)" },
-            { "VECS %", "GPU Video Prostproc Utilization (%)" }
-            // Add mappings for 'se' and 'wa' if you want to expose them
-        };
-        private readonly Dictionary<string, float> _sensorValues;
+
         private bool _headersRead = false;
 
-        public IntelGpuSensorDataProvider(string friendlyName)
+        public IntelGpuSensorDataProvider(string friendlyName, List<string> provideSensors)
         {
             FriendlyName = friendlyName;
-            _sensorValues = [];
-            _currentSensorData = new SensorData { Values = _sensorValues }; // Use the pre-allocated dictionary
+            _provideSensors = provideSensors;
+            _sensorData = new (string, float)[_provideSensors.Count];
             _outputBuffer = new byte[4096]; // Initial buffer size
             StartIntelGpuTop();
         }
@@ -134,7 +122,7 @@ namespace HwMonLinux
 
             if (lines.Length > 0)
             {
-                lock (_currentSensorData)
+                lock (_sensorData)
                 {
                     if (!_headersRead)
                     {
@@ -145,10 +133,7 @@ namespace HwMonLinux
                             _dynamicHeaderMap.Clear();
                             for (int i = 0; i < headers.Length; i++)
                             {
-                                if (_headerMapping.ContainsKey(headers[i]))
-                                {
-                                    _dynamicHeaderMap[i] = headers[i];
-                                }
+                                _dynamicHeaderMap[i] = headers[i];
                             }
                             _headersRead = true;
                         }
@@ -161,20 +146,18 @@ namespace HwMonLinux
 
                     if (_headersRead && lines.Length > 0)
                     {
-                        _sensorValues.Clear();
                         string[] values = lines.LastOrDefault().Split(_csvSeparators, StringSplitOptions.TrimEntries);
 
+                        int i = 0;
                         foreach (var kvp in _dynamicHeaderMap)
                         {
-                            int index = kvp.Key;
-                            string header = kvp.Value;
-
-                            if (index < values.Length)
+                            if (kvp.Key < values.Length)
                             {
-                                if (_headerMapping.TryGetValue(header, out string mappedName) &&
-                                    float.TryParse(values[index], NumberStyles.Float, CultureInfo.InvariantCulture, out float value))
+                                if (float.TryParse(values[kvp.Key], NumberStyles.Float, CultureInfo.InvariantCulture, out float value) && _provideSensors.Contains(kvp.Value))
                                 {
-                                    _sensorValues[mappedName] = value;
+                                    _sensorData[i].Item1 = kvp.Value;
+                                    _sensorData[i].Item2 = value;
+                                    i++;
                                 }
                             }
                         }
@@ -190,11 +173,12 @@ namespace HwMonLinux
             // Optionally restart the process or handle the termination
         }
 
-        public SensorData GetSensorData()
+        public bool GetSensorData(out (string, float)[] data)
         {
-            lock (_currentSensorData)
+            lock (_sensorData)
             {
-                return _currentSensorData;
+                data = _sensorData;
+                return true;
             }
         }
 

@@ -2,9 +2,7 @@
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
-using System.Reflection;
 using System.Threading.Tasks;
-using System.Collections.Specialized;
 
 namespace HwMonLinux
 {
@@ -21,22 +19,40 @@ namespace HwMonLinux
             // Create a folder for the static web server files
             Directory.CreateDirectory(config.WebServer.ContentRoot);
 
-            // Create a list of sensor data providers by loading from config
+            // Create a list of sensor data providers and the sensor index
             var sensorDataProviders = new List<ISensorDataProvider>();
+            var sensorIndexBuilder = new List<(string, (string, string)[])>();
+            var allSensorLabels = new Dictionary<string, Dictionary<string, string>>(); // Store labels per provider
+
             if (config.SensorProviders != null)
             {
                 foreach (var providerDef in config.SensorProviders)
                 {
-                    ISensorDataProvider provider = LoadSensorProvider(providerDef);
-                    if (provider != null)
+                    ISensorDataProvider provider = LoadSensorProvider(providerDef, out (string, string)[] providedSensors, out Dictionary<string, string> labels);
+                    if (provider != null && providedSensors != null && providedSensors.Length > 0)
                     {
                         sensorDataProviders.Add(provider);
+                        sensorIndexBuilder.Add((provider.Name, providedSensors));
+                        allSensorLabels[provider.Name] = labels;
+                    }
+                    else if (provider != null)
+                    {
+                        Console.WriteLine($"Warning: Sensor provider '{provider.Name}' loaded, but no 'provideSensors' configured or found.");
                     }
                 }
             }
 
             // Create and start web server
-            var webServer = new WebServer(config.WebServer.Host, config.WebServer.Port, config.WebServer.ContentRoot, config.SensorData.DataRetentionSeconds, sensorDataProviders, config.SensorGroups);
+            var webServer = new WebServer(
+                config.WebServer.Host,
+                config.WebServer.Port,
+                config.WebServer.ContentRoot,
+                config.SensorData.DataRetentionSeconds,
+                sensorDataProviders,
+                config.SensorGroups,
+                sensorIndexBuilder.ToArray(), // Pass the sensor index
+                allSensorLabels // Pass the sensor labels
+            );
             await webServer.StartAsync();
 
             Console.WriteLine("Press any key to stop the server.");
@@ -45,11 +61,18 @@ namespace HwMonLinux
             await webServer.StopAsync();
         }
 
-        static ISensorDataProvider LoadSensorProvider(SensorProviderDefinition providerDef)
+        static ISensorDataProvider LoadSensorProvider(SensorProviderDefinition providerDef, out (string, string)[] providedSensors, out Dictionary<string, string> labels)
         {
             string typeName = providerDef.Type;
             var providerConfig = providerDef.Config;
             Type type = Type.GetType(typeName);
+            providedSensors = null;
+            labels = providerConfig.TryGetValue("sensorLabels", out var sensorLabelsObj) && sensorLabelsObj is Dictionary<object, object> rawLabels
+                ? rawLabels.ToDictionary(k => k.Key.ToString(), v => v.ToString() ?? "")
+                : new Dictionary<string, string>();
+
+            // Capture the labels dictionary in a local variable
+            var localLabels = labels;
 
             if (type != null && typeof(ISensorDataProvider).IsAssignableFrom(type))
             {
@@ -60,6 +83,7 @@ namespace HwMonLinux
                     var parameters = constructor.GetParameters();
                     var constructorArgs = new List<object>();
                     bool canCreate = true;
+                    List<string> foundProvidedSensorsList = null;
 
                     foreach (var paramInfo in parameters)
                     {
@@ -73,7 +97,28 @@ namespace HwMonLinux
                                 }
                                 else if (paramInfo.ParameterType == typeof(List<string>))
                                 {
-                                    constructorArgs.Add(ConvertToStringList(configValue));
+                                    var stringList = ConvertToStringList(configValue);
+                                    constructorArgs.Add(stringList);
+                                    if (paramInfo.Name == "provideSensors")
+                                    {
+                                        foundProvidedSensorsList = stringList;
+                                    }
+                                }
+                                else if (paramInfo.ParameterType == typeof(string))
+                                {
+                                    constructorArgs.Add(configValue?.ToString());
+                                }
+                                else if (paramInfo.ParameterType == typeof(int))
+                                {
+                                    constructorArgs.Add(Convert.ToInt32(configValue));
+                                }
+                                else if (paramInfo.ParameterType == typeof(long))
+                                {
+                                    constructorArgs.Add(Convert.ToInt64(configValue));
+                                }
+                                else if (paramInfo.ParameterType == typeof(bool))
+                                {
+                                    constructorArgs.Add(Convert.ToBoolean(configValue));
                                 }
                                 else
                                 {
@@ -106,7 +151,8 @@ namespace HwMonLinux
                             var instance = Activator.CreateInstance(type, constructorArgs.ToArray()) as ISensorDataProvider;
                             if (instance != null)
                             {
-                                Console.WriteLine($"Loaded sensor provider: {instance.FriendlyName} ({instance.Name})");
+                                providedSensors = foundProvidedSensorsList?.Select(sensorName => (sensorName, localLabels.TryGetValue(sensorName, out var label) ? label : sensorName)).ToArray();
+                                Console.WriteLine($"Loaded sensor provider: {instance.FriendlyName} ({instance.Name}) providing {providedSensors.Length} sensors.");
                                 return instance;
                             }
                             else

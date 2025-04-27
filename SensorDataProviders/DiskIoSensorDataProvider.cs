@@ -10,24 +10,24 @@ namespace HwMonLinux
 {
     public class DiskIoSensorDataProvider : ISensorDataProvider, IDisposable
     {
-        public string Name => "DiskIO";
+        public string Name => "io.disks";
         public string FriendlyName { get; }
-        private readonly Dictionary<string, string> _sensorNameOverrides;
+
+        private readonly List<string> _provideSensors;
 
         private Dictionary<string, (long ReadBytes, long WriteBytes, DateTime Timestamp)> _previousStats = new Dictionary<string, (long, long, DateTime)>();
         private List<string> _mountPoints = new List<string>();
-        private SensorData _sensorData;
+        private (string, float)[] _sensorData;
         private Dictionary<string, (long ReadBytes, long WriteBytes)> _currentStats;
         private bool _disposed = false;
 
-        public DiskIoSensorDataProvider(string friendlyName, Dictionary<string, string> sensorNameOverrides = null)
+        public DiskIoSensorDataProvider(string friendlyName, List<string> provideSensors)
         {
             FriendlyName = friendlyName;
-            _sensorNameOverrides = sensorNameOverrides ?? new();
+            _provideSensors = provideSensors;
             _currentStats = new();
-            _sensorData = new();
-            _sensorData.Values = new();
             _mountPoints = GetMonitoredMountPoints();
+            _sensorData = new (string, float)[_provideSensors.Count];
         }
 
         private List<string> GetMonitoredMountPoints()
@@ -55,21 +55,18 @@ namespace HwMonLinux
             return mountPoints;
         }
 
-        public SensorData GetSensorData()
+        public bool GetSensorData(out (string, float)[] data)
         {
             ReadDiskStats();
             var now = DateTime.UtcNow;
 
+            int i = 0;
             foreach (var mountPoint in _mountPoints)
             {
                 if (_currentStats.TryGetValue(mountPoint, out var current))
                 {
                     // Apply sensor name overrides
                     string finalSensorName = mountPoint.Split('/')[2];
-                    if (_sensorNameOverrides.ContainsKey(finalSensorName))
-                    {
-                        finalSensorName = _sensorNameOverrides[finalSensorName];
-                    }
                     if (_previousStats.TryGetValue(mountPoint, out var previous))
                     {
                         var timeDiff = now - previous.Timestamp;
@@ -80,9 +77,20 @@ namespace HwMonLinux
 
                             var readMBps = readDiffBytes / timeDiff.TotalSeconds / (1024 * 1024d);
                             var writeMBps = writeDiffBytes / timeDiff.TotalSeconds / (1024 * 1024d);
+                            
+                            if (_provideSensors.Contains(finalSensorName+".r"))
+                            {
+                                _sensorData[i].Item1 = $"{finalSensorName}.r";
+                                _sensorData[i].Item2 = (float)Math.Round(readMBps, 3);
+                                i++;
+                            }
 
-                            _sensorData.Values[$"{finalSensorName} Read (MB/s)"] = (float)Math.Round(readMBps, 3);
-                            _sensorData.Values[$"{finalSensorName} Write (MB/s)"] = (float)Math.Round(writeMBps, 3);
+                            if (_provideSensors.Contains(finalSensorName+".w"))
+                            {
+                                _sensorData[i].Item1 = $"{finalSensorName}.w";
+                                _sensorData[i].Item2 = (float)Math.Round(writeMBps, 3);
+                                i++;
+                            }
                         }
                     }
                     _previousStats[mountPoint] = (current.ReadBytes, current.WriteBytes, now);
@@ -103,7 +111,8 @@ namespace HwMonLinux
                 }
             }
 
-            return _sensorData;
+            data = _sensorData;
+            return true;
         }
 
         private void ReadDiskStats()

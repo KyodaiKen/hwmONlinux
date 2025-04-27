@@ -10,23 +10,24 @@ namespace HwMonLinux
 {
         public class NetworkIoSensorDataProvider : ISensorDataProvider, IDisposable
     {
-        public string Name => "NetworkIO";
+        public string Name => "io.network";
         public string FriendlyName { get; }
-        private readonly Dictionary<string, string> _sensorNameOverrides;
+
+        private readonly List<string> _provideSensors;
+        
         private Dictionary<string, (long ReceivedBytes, long TransmittedBytes)> _networkStats;
-        private SensorData _sensorData;
+        private (string, float)[] _sensorData;
 
         private Dictionary<string, (long ReceivedBytes, long TransmittedBytes, DateTime Timestamp)> _previousStats = new Dictionary<string, (long, long, DateTime)>();
         private List<string> _networkInterfaces = new List<string>();
         private bool _disposed = false;
 
-        public NetworkIoSensorDataProvider(string friendlyName,  Dictionary<string, string> sensorNameOverrides = null)
+        public NetworkIoSensorDataProvider(string friendlyName, List<string> provideSensors)
         {
             FriendlyName = friendlyName;
-            _sensorNameOverrides = sensorNameOverrides ?? new Dictionary<string, string>();
+            _provideSensors = provideSensors;
             _networkInterfaces = GetActiveEthernetInterfaces();
-            _sensorData = new();
-            _sensorData.Values = new();
+            _sensorData = new (string, float)[_provideSensors.Count * 2];
         }
 
         private List<string> GetActiveEthernetInterfaces()
@@ -52,54 +53,46 @@ namespace HwMonLinux
             return interfaces;
         }
 
-        public SensorData GetSensorData()
+        public bool GetSensorData(out (string, float)[] data)
         {
             ReadNetworkStats();
             var now = DateTime.UtcNow;
 
+            int i = 0;
             foreach (var iface in _networkInterfaces)
             {
                 if (_networkStats.TryGetValue(iface, out var current))
                 {
-                    // Apply sensor name overrides
-                    string finalSensorName = iface;
-                    if (_sensorNameOverrides.ContainsKey(iface))
-                    {
-                        finalSensorName = _sensorNameOverrides[iface];
-                    }
                     if (_previousStats.TryGetValue(iface, out var previous))
                     {
                         var timeDiff = now - previous.Timestamp;
                         if (timeDiff.TotalSeconds > 0)
                         {
-                            var receivedDiffBytes = current.ReceivedBytes - previous.ReceivedBytes;
-                            var transmittedDiffBytes = current.TransmittedBytes - previous.TransmittedBytes;
+                            if (_provideSensors.Contains(iface+".rx"))
+                            {
+                                var receivedDiffBytes = current.ReceivedBytes - previous.ReceivedBytes;
+                                var receivedMbps = (double)receivedDiffBytes * 8 / timeDiff.TotalSeconds / (1000 * 1000); // Bytes to Bits, then to MBit/s
+                                _sensorData[i].Item1 = iface+".rx";
+                                _sensorData[i].Item2 = (float)Math.Round(receivedMbps, 3);
+                                i++;
+                            }
 
-                            var receivedMbps = (double)receivedDiffBytes * 8 / timeDiff.TotalSeconds / (1000 * 1000); // Bytes to Bits, then to MBit/s
-                            var transmittedMbps = (double)transmittedDiffBytes * 8 / timeDiff.TotalSeconds / (1000 * 1000); // Bytes to Bits, then to MBit/s
-
-                            _sensorData.Values[$"{finalSensorName} Rx (MBit/s)"] = (float)Math.Round(receivedMbps, 3);
-                            _sensorData.Values[$"{finalSensorName} Tx (MBit/s)"] = (float)Math.Round(transmittedMbps, 3);
+                            if (_provideSensors.Contains(iface+".tx"))
+                            {
+                                var transmittedDiffBytes = current.TransmittedBytes - previous.TransmittedBytes;
+                                var transmittedMbps = (double)transmittedDiffBytes * 8 / timeDiff.TotalSeconds / (1000 * 1000); // Bytes to Bits, then to MBit/s
+                                _sensorData[i].Item1 = iface+".tx";
+                                _sensorData[i].Item2 = (float)Math.Round(transmittedMbps, 3);
+                                i++;
+                            }
                         }
                     }
                     _previousStats[iface] = (current.ReceivedBytes, current.TransmittedBytes, now);
                 }
-                else if (_previousStats.ContainsKey(iface))
-                {
-                    _previousStats.Remove(iface); // Interface might be down
-                }
             }
 
-            // Add stats for interfaces that became active since last check
-            foreach (var stat in _networkStats)
-            {
-                if (!_networkInterfaces.Contains(stat.Key) && !_previousStats.ContainsKey(stat.Key) && !stat.Key.StartsWith("lo"))
-                {
-                    _networkInterfaces.Add(stat.Key);
-                    _previousStats[stat.Key] = (stat.Value.ReceivedBytes, stat.Value.TransmittedBytes, now);
-                }
-            }
-            return _sensorData;
+            data = _sensorData;
+            return true;
         }
 
         private void ReadNetworkStats()

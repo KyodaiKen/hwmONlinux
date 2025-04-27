@@ -10,28 +10,32 @@ namespace HwMonLinux
 {
     public class IntelPackagePowerSensorDataProvider : ISensorDataProvider
     {
-        public string Name => "IntelPackagePower";
+        public string Name => "cpu.power.intel.package";
         public string FriendlyName { get; }
         private readonly string _energyFilePath;
+
+        private readonly List<string> _provideSensors;
+
         private ulong _previousEnergyMicroJoules = 0;
         private DateTime _previousReadTime = DateTime.MinValue;
-        private SensorData _sensorData;
+        private (string, float)[] _sensorData;
 
-        public IntelPackagePowerSensorDataProvider(string friendlyName, string energyFilePath = "/sys/class/powercap/intel-rapl/intel-rapl:0/energy_uj")
+        // Example energyFilePath = "/sys/class/powercap/intel-rapl/intel-rapl:0/energy_uj"
+        public IntelPackagePowerSensorDataProvider(string friendlyName, string energyFilePath, List<string> provideSensors)
         {
             FriendlyName = friendlyName;
             _energyFilePath = energyFilePath;
+            _provideSensors = provideSensors;
 
             if (!File.Exists(_energyFilePath))
             {
                 Console.WriteLine($"Warning: Energy statistics file not found at '{_energyFilePath}'. This provider might not function.");
             }
 
-            _sensorData = new();
-            _sensorData.Values = new();
+            _sensorData = new (string, float)[_provideSensors.Count];
         }
 
-        public SensorData GetSensorData()
+        public bool GetSensorData(out (string, float)[] data)
         {
             try
             {
@@ -49,7 +53,8 @@ namespace HwMonLinux
                             if (timeDiff.TotalSeconds > 0)
                             {
                                 // Convert microjoules to joules and divide by time in seconds to get Watts
-                                _sensorData.Values["Package Power (W)"] = (float)(energyDiff / timeDiff.TotalSeconds / 1_000_000.0);
+                                _sensorData[0].Item1 = "package.power";
+                                _sensorData[0].Item2 = (float)(energyDiff / timeDiff.TotalSeconds / 1_000_000.0);
                             }
                         }
                         _previousEnergyMicroJoules = currentEnergyMicroJoules;
@@ -65,12 +70,14 @@ namespace HwMonLinux
                     Console.WriteLine($"Warning: Energy statistics file not found at '{_energyFilePath}'.");
                 }
 
-                return _sensorData;
+                data = _sensorData;
+                return true;
             }
             catch (Exception ex)
             {
                 Console.WriteLine($"Error reading Intel package power data from '{_energyFilePath}': {ex.Message}");
-                return null;
+                data = [];
+                return false;
             }
         }
     }

@@ -8,12 +8,11 @@ namespace HwMonLinux
 {
     public class NvidiaSmiSensorDataProvider : ISensorDataProvider
     {
-        public string Name => "NvidiaSmi";
+        public string Name => "gpu.nvidia-smi";
         public string FriendlyName { get; }
-        private readonly List<string> _queriedSensors;
-        private readonly Dictionary<string, string> _sensorNameOverrides;
+        private readonly List<string> _provideSensors;
 
-        private SensorData _sensorData;
+        private (string, float)[] _sensorData;
 
         // A list of all possible nvidia-smi query options (as of a certain point).
         // This list might need to be updated with newer driver versions.
@@ -78,22 +77,18 @@ namespace HwMonLinux
             // Add other metrics as needed based on nvidia-smi --help-query-gpu
         ];
 
-        public NvidiaSmiSensorDataProvider(string friendlyName, List<string> queriedSensors = null, Dictionary<string, string> sensorNameOverrides = null)
+        public NvidiaSmiSensorDataProvider(string friendlyName, List<string> provideSensors)
         {
             FriendlyName = friendlyName;
-            _queriedSensors = queriedSensors?.Where(s => AllNvidiaSmiMetrics.Contains(s)).ToList() ?? new List<string> {
-                "name", "temperature.gpu", "utilization.gpu", "memory.used", "power.draw"
-            };
-            _sensorNameOverrides = sensorNameOverrides ?? new();
-            _sensorData ??= new();
-            _sensorData.Values ??= new();
+            _provideSensors = provideSensors;
+            _sensorData = new (string, float)[_provideSensors.Count];
         }
 
-        public SensorData GetSensorData()
+        public bool GetSensorData(out (string, float)[] data)
         {
             try
             {
-                string queryArguments = $"--query-gpu={string.Join(",", _queriedSensors)} --format=csv,noheader,nounits";
+                string queryArguments = $"--query-gpu={string.Join(",", _provideSensors)} --format=csv,noheader,nounits";
                 string output;
                 using (var process = new Process())
                 {
@@ -113,29 +108,31 @@ namespace HwMonLinux
                 for (int i = 0; i < lines.Length; i++)
                 {
                     var values = lines[i].Split(',').Select(v => v.Trim()).ToList();
-                    for (int j = 0; j < _queriedSensors.Count && j < values.Count; j++)
+                    for (int j = 0; j < _provideSensors.Count && j < values.Count; j++)
                     {
-                        string rawSensorName = _queriedSensors[j];
-                        string friendlySensorName = _sensorNameOverrides.ContainsKey(rawSensorName) ? _sensorNameOverrides[rawSensorName] : rawSensorName;
-                        string fullSensorNameWithUnit = friendlySensorName;
+                        string rawSensorName = _provideSensors[j];
 
                         if (float.TryParse(values[j], NumberStyles.Float, CultureInfo.InvariantCulture, out float floatValue))
                         {
-                            _sensorData.Values[fullSensorNameWithUnit] = floatValue;
+                            _sensorData[j].Item1 = _provideSensors[j];
+                            _sensorData[j].Item2 = floatValue;
                         }
                         else if (int.TryParse(values[j], NumberStyles.Integer, CultureInfo.InvariantCulture, out int intValue))
                         {
-                            _sensorData.Values[fullSensorNameWithUnit] = intValue;
+                            _sensorData[j].Item1 = _provideSensors[j];
+                            _sensorData[j].Item2 = intValue;
                         }
                     }
                     values = [];
                 }
-                return _sensorData;
+                data = _sensorData;
+                return true;
             }
             catch (Exception ex)
             {
                 Console.WriteLine($"Error reading NVIDIA SMI data: {ex.Message}");
-                return null;
+                data = [];
+                return false;
             }
         }
     }

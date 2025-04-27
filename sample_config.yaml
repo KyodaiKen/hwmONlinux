@@ -13,19 +13,34 @@ sensorProviders:
       baudRate: 115200
       queryCommand: "bs"
       identificationString: "KyoudaiKen FC02"
-    publishedSensors:
-      - "Water Temperature (°C)"
-      - "Case Temperature (°C)"
-      - "Ambient Temperature (°C)"
-      - "Water MV"
-      - "Case MV"
-      - "Radiator Fan Speed (%)"
-      - "Case Fan Speed (%)"
+      provideSensors:
+        - "temp.water"
+        - "temp.case"
+        - "temp.ambient"
+        - "matrix.radiator-fans"
+        - "matrix.case-fans"
+        - "pwm.radiator-fans"
+        - "pwm.case-fans"
+      sensorLabels:
+        "temp.water": "Water Temperature (°C)"
+        "temp.case": "Case Temperature (°C)"
+        "temp.ambient": "Ambient Temperature (°C)"
+        "matrix.radiator-fans": "Water MV"
+        "matrix.case-fans": "Case MV"
+        "pwm.radiator-fans": "Radiator Fan Speed (%)"
+        "pwm.case-fans": "Case Fan Speed (%)"
   - type: "HwMonLinux.LmsensorsSensorDataProvider, HwmONlinuxServer"
     config:
       friendlyName: "LMSensors"
-      filterRegex: "^(nct6798-isa-0290-fan2|nct6798-isa-0290-fan7|nct6798-isa-0290-PCH_CHIP_TEMP|coretemp-isa-0000-Package id 0|acpitz-acpi-0-temp1|spd5118-i2c-14-51-temp1|spd5118-i2c-14-53-temp1)$"
-      sensorNameOverrides:
+      provideSensors:
+        - "nct6798-isa-0290-fan2"
+        - "nct6798-isa-0290-fan7"
+        - "nct6798-isa-0290-PCH_CHIP_TEMP"
+        - "coretemp-isa-0000-Package id 0"
+        - "acpitz-acpi-0-temp1"
+        - "spd5118-i2c-14-51-temp1"
+        - "spd5118-i2c-14-53-temp1"
+      sensorLabels:
         nct6798-isa-0290-fan2: "Rad (RPM)"
         nct6798-isa-0290-fan7: "Pump (RPM)"
         nct6798-isa-0290-PCH_CHIP_TEMP: "PCH (°C)"
@@ -36,7 +51,7 @@ sensorProviders:
   - type: "HwMonLinux.NvidiaSmiSensorDataProvider, HwmONlinuxServer"
     config:
       friendlyName: "NVidia RTX 3090"
-      queriedSensors:
+      provideSensors:
         - "temperature.gpu"
         - "utilization.gpu"
         - "utilization.memory"
@@ -48,7 +63,7 @@ sensorProviders:
         - "clocks.current.graphics"
         - "clocks.current.sm"
         - "clocks.current.memory"
-      sensorNameOverrides:
+      sensorLabels:
         "temperature.gpu": "Core Temperature (°C)"
         "utilization.gpu": "Core Load (%)"
         "utilization.memory": "Memory Controller Load (%)"
@@ -64,57 +79,84 @@ sensorProviders:
     config:
       friendlyName: "Intel Core i9-13900KS"
       energyFilePath: "/sys/class/powercap/intel-rapl/intel-rapl:0/energy_uj"
+      provideSensors:
+        - "package.power"
+      sensorLabels:
+        "package.power": "Package Power (W)" 
   - type: "HwMonLinux.CpuUtilizationSensorDataProvider, HwmONlinuxServer"
     config:
       friendlyName: "CPU Util"
-    publishedSensors:
-      - "Overall Utilization (%)"
+      provideSensors:
+        - "overall"
+      sensorLabels:
+        "overall": "Overall Utilization (%)"
   - type: "HwMonLinux.MemoryUtilizationSensorDataProvider, HwmONlinuxServer"
     config:
       friendlyName: "System Memory"
-    publishedSensors:
-      - "Memory Used (GB)"
-      - "Swap Used (GB)"
+      provideSensors:
+        - "MemUsed"
+        - "SwapUsed"
+      sensorLabels:
+        "MemUsed": "Memory Used (GB)"
+        "SwapUsed": "Swap Used (GB)"
   - type: "HwMonLinux.IntelGpuSensorDataProvider, HwmONlinuxServer"
     config:
       friendlyName: "Intel iGPU"
-    publishedSensors:
-      - "GPU Render/3D Utilization (%)"
-      - "GPU Blitter Utilization (%)"
-      - "GPU Video Engine Utilization (%)"
-      - "GPU Video Prostproc Utilization (%)"
-      - "GPU Frequency (MHz)"
-      - "GPU Power (W)"
+      provideSensors:
+        - "Freq MHz req"
+        - "Power W gpu"
+        - "RCS %"
+        - "BCS %"
+        - "VCS %"
+        - "VECS %"
+      sensorLabels:
+        "Freq MHz req": "GPU Frequency (MHz)"
+        "Power W gpu": "GPU Power (W)"
+        "RCS %": "GPU Render/3D Utilization (%)"
+        "BCS %": "GPU Blitter Utilization (%)"
+        "VCS %": "GPU Video Engine Utilization (%)"
+        "VECS %": "GPU Video Prostproc Utilization (%)"
   - type: "HwMonLinux.NetworkIoSensorDataProvider, HwmONlinuxServer"
     config:
       friendlyName: "Network I/O"
-      sensorNameOverrides:
-        eno1: "10G NAS"
-        eno2: "FritzBox"
-    publishedSensors:
-      - "10G NAS Rx (MBit/s)"
-      - "10G NAS Tx (MBit/s)"
-      - "FritzBox Rx (MBit/s)"
-      - "FritzBox Tx (MBit/s)"
+      provideSensors:
+        - "eno1.rx"
+        - "eno1.tx"
+        - "eno2.rx"
+        - "eno2.tx"
+      sensorLabels:
+        #The system adds Rx (MBit/s) or Tx (MBit/s), here. You need to specify this in the groups!
+        #sensorNameRx = "{sensorLabel} Rx (MBit/s)"
+        #sensorNameTx = "{sensorLabel} Tx (MBit/s)"
+        eno1.rx: "10G NAS Rx (MBit/s)"
+        eno1.tx: "10G NAS Tx (MBit/s)"
+        eno2.rx: "FritzBox Rx (MBit/s)"
+        eno2.tx: "FritzBox Tx (MBit/s)"
   - type: "HwMonLinux.DiskIoSensorDataProvider, HwmONlinuxServer"
     config:
       friendlyName: "Disk I/O"
-      sensorNameOverrides:
-        nvme0n1: "Windows"
-        nvme1n1: "Data"
-        nvme2n1: "Fedora"
-        nvme3n1: "Games"
-    publishedSensors:
-      - "Fedora Read (MB/s)"
-      - "Fedora Write (MB/s)"
-      - "Windows Read (MB/s)"
-      - "Windows Write (MB/s)"
-      - "Data Read (MB/s)"
-      - "Data Write (MB/s)"
-      - "Games Read (MB/s)"
-      - "Games Write (MB/s)"
+      provideSensors:
+        - "nvme1n1.r"
+        - "nvme1n1.w"
+        - "nvme0n1.r"
+        - "nvme0n1.w"
+        - "nvme3n1.r"
+        - "nvme3n1.w"
+        - "nvme2n1.r"
+        - "nvme2n1.w"
+      sensorLabels:
+        #The system adds .r or .w for read and write to the name!
+        "nvme0n1.r": "Windows Read (MB/s)"
+        "nvme0n1.w": "Windows (MB/s)"
+        "nvme1n1.r": "Data (MB/s)"
+        "nvme1n1.w": "Data (MB/s)"
+        "nvme2n1.r": "Fedora (MB/s)"
+        "nvme2n1.w": "Fedora (MB/s)"
+        "nvme3n1.r": "Games (MB/s)"
+        "nvme3n1.w": "Games (MB/s)"
 
 sensorGroups:
+  #Sensor identifier: "{provierFriendlyName} {sensorName}"
   - name: "system_temps"
     friendlyName: "System Temperatures & Fans"
     sensorIdentifiers:

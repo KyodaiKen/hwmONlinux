@@ -8,19 +8,22 @@ namespace HwMonLinux
 {
     public class MemoryUtilizationSensorDataProvider : ISensorDataProvider
     {
-        public string Name => "memory";
+        public string Name => "stats.memory";
+
         public string FriendlyName { get; }
 
-        private SensorData _sensorData;
+        private readonly List<string> _provideSensors;
 
-        public MemoryUtilizationSensorDataProvider(string friendlyName)
+        private (string, float)[] _sensorData;
+
+        public MemoryUtilizationSensorDataProvider(string friendlyName, List<string> provideSensors)
         {
             FriendlyName = friendlyName;
-            _sensorData = new();
-            _sensorData.Values = new();
+            _provideSensors = provideSensors;
+            _sensorData = new (string, float)[_provideSensors.Count];
         }
 
-        public SensorData GetSensorData()
+        public bool GetSensorData(out (string, float)[] data)
         {
             if (Environment.OSVersion.Platform == PlatformID.Unix)
             {
@@ -29,73 +32,78 @@ namespace HwMonLinux
                     string memInfo = File.ReadAllText("/proc/meminfo");
                     string[] lines = memInfo.Split('\n', StringSplitOptions.RemoveEmptyEntries);
                     memInfo = "";
+
                     long totalMemoryKb = 0;
                     long freeMemoryKb = 0;
-                    long availableMemoryKb = 0;
                     long buffersKb = 0;
                     long cachedKb = 0;
+                    long usedMemoryKb = 0;
                     long swapTotalKb = 0;
                     long swapFreeKb = 0;
+                    long usedSwapKb = 0;
 
+                    int i = 0;
                     foreach (string line in lines)
                     {
-                        if (line.StartsWith("MemTotal:", StringComparison.OrdinalIgnoreCase))
-                        {
-                            TryParseKbValue(line, out totalMemoryKb);
-                        }
-                        else if (line.StartsWith("MemFree:", StringComparison.OrdinalIgnoreCase))
-                        {
-                            TryParseKbValue(line, out freeMemoryKb);
-                        }
-                        else if (line.StartsWith("MemAvailable:", StringComparison.OrdinalIgnoreCase))
-                        {
-                            TryParseKbValue(line, out availableMemoryKb);
-                        }
-                        else if (line.StartsWith("Buffers:", StringComparison.OrdinalIgnoreCase))
-                        {
-                            TryParseKbValue(line, out buffersKb);
-                        }
-                        else if (line.StartsWith("Cached:", StringComparison.OrdinalIgnoreCase))
-                        {
-                            TryParseKbValue(line, out cachedKb);
-                        }
-                        else if (line.StartsWith("SwapTotal:", StringComparison.OrdinalIgnoreCase))
-                        {
-                            TryParseKbValue(line, out swapTotalKb);
-                        }
-                        else if (line.StartsWith("SwapFree:", StringComparison.OrdinalIgnoreCase))
-                        {
-                            TryParseKbValue(line, out swapFreeKb);
-                        }
-                    }
+                        string metric = line.Split(':')[0];
 
-                    // Calculate memory utilization
-                    if (totalMemoryKb > 0)
-                    {
-                        long usedMemoryKb = totalMemoryKb - freeMemoryKb - buffersKb - cachedKb;
-                        double memoryUsage = (double)usedMemoryKb / totalMemoryKb;
-                        _sensorData.Values["Memory Utilization (%)"] = (float)Math.Round(memoryUsage * 100, 2);
-                        _sensorData.Values["Memory Total (GB)"] = (float)Math.Round((double)totalMemoryKb / (1024 * 1024), 2);
-                        _sensorData.Values["Memory Used (GB)"] = (float)Math.Round((double)usedMemoryKb / (1024 * 1024), 2);
-                        _sensorData.Values["Memory Free (GB)"] = (float)Math.Round((double)(freeMemoryKb + buffersKb + cachedKb) / (1024 * 1024), 2);
-                    }
+                        // Parse metric value
+                        TryParseKbValue(line, out long value);
+                        
+                        if(_provideSensors.Contains(metric)) {
+                            // Output
+                            _sensorData[i].Item1 = metric;
+                            _sensorData[i].Item2 = (float)Math.Round((double)value / (1024 * 1024), 2);
+                            i++;
+                        }
 
-                    // Calculate swap utilization
-                    if (swapTotalKb > 0)
-                    {
-                        long usedSwapKb = swapTotalKb - swapFreeKb;
-                        double swapUsage = (double)usedSwapKb / swapTotalKb;
-                        _sensorData.Values["Swap Utilization (%)"] = (float)Math.Round(swapUsage * 100, 2);
-                        _sensorData.Values["Swap Total (GB)"] = (float)Math.Round((double)swapTotalKb / (1024 * 1024), 2);
-                        _sensorData.Values["Swap Used (GB)"] = (float)Math.Round((double)usedSwapKb / (1024 * 1024), 2);
-                        _sensorData.Values["Swap Free (GB)"] = (float)Math.Round((double)swapFreeKb / (1024 * 1024), 2);
-                    }
-                    else
-                    {
-                        _sensorData.Values["Swap Utilization (%)"] = 0.0f;
-                        _sensorData.Values["Swap Total (GB)"] = 0.0f;
-                        _sensorData.Values["Swap Used (GB)"] = 0.0f;
-                        _sensorData.Values["Swap Free (GB)"] = 0.0f;
+                        switch (metric)
+                        {
+                            case "MemTotal":
+                                totalMemoryKb = value;
+                                break;
+                            case "MemFree":
+                                freeMemoryKb = value;
+                                break;
+                            case "Buffers":
+                                buffersKb = value;
+                                break;
+                            case "Cached":
+                                cachedKb = value;
+                                usedMemoryKb = totalMemoryKb - freeMemoryKb - buffersKb - cachedKb;
+                                if (_provideSensors.Contains("MemUsed"))
+                                {
+                                    _sensorData[i].Item1 = "MemUsed";
+                                    _sensorData[i].Item2 = (float)Math.Round((double)usedMemoryKb / (1024 * 1024), 2);
+                                    i++;
+                                }
+                                if (_provideSensors.Contains("MemUtil%"))
+                                {
+                                    _sensorData[i].Item1 = "MemUtil%";
+                                    _sensorData[i].Item2 = (float)Math.Round((double)usedMemoryKb / totalMemoryKb * 100, 2);
+                                    i++;
+                                }
+                                break;
+                            case "SwapTotal":
+                                swapTotalKb = value;
+                                break;
+                            case "SwapFree":
+                                swapFreeKb = value;
+                                usedSwapKb = swapTotalKb - swapFreeKb;
+                                if (_provideSensors.Contains("SwapUsed"))
+                                {
+                                    _sensorData[i].Item1 = "SwapUsed";
+                                    _sensorData[i].Item2 = (float)Math.Round((double)usedSwapKb / (1024 * 1024), 2);
+                                    i++;
+                                }
+                                if (_provideSensors.Contains("SwapUtil%"))
+                                {
+                                    _sensorData[i].Item1 = "SwapUtil%";
+                                    _sensorData[i].Item2 = (float)Math.Round((double)usedSwapKb / swapTotalKb * 100, 2);
+                                    i++;
+                                }
+                                break;
+                        }
                     }
                 }
                 catch (Exception ex)
@@ -105,18 +113,13 @@ namespace HwMonLinux
             }
             else
             {
-                _sensorData.Values["Memory Utilization (%)"] = 0.0f;
-                _sensorData.Values["Memory Total (GB)"] = 0.0f;
-                _sensorData.Values["Memory Used (GB)"] = 0.0f;
-                _sensorData.Values["Memory Free (GB)"] = 0.0f;
-                _sensorData.Values["Swap Utilization (%)"] = 0.0f;
-                _sensorData.Values["Swap Total (GB)"] = 0.0f;
-                _sensorData.Values["Swap Used (GB)"] = 0.0f;
-                _sensorData.Values["Swap Free (GB)"] = 0.0f;
                 Console.WriteLine("Memory utilization on non-Unix systems requires platform-specific implementation.");
+                data = [];
+                return false;
             }
 
-            return _sensorData;
+            data = _sensorData;
+            return true;
         }
 
         private static bool TryParseKbValue(string line, out long valueKb)

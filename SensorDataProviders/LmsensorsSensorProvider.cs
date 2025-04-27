@@ -10,30 +10,20 @@ namespace HwMonLinux
 {
     public class LmsensorsSensorDataProvider : ISensorDataProvider
     {
-        public string Name => "Lmsensors";
-        private readonly string _filterRegex;
-        private readonly Dictionary<string, string> _sensorNameOverrides;
+        public string Name => "lmsensors";
+        private readonly List<string> _provideSensors;
         public string FriendlyName { get; }
 
-        private SensorData _sensorData;
+        private (string, float)[] _sensorData;
 
-        /// <summary>
-        /// Initializes a new instance of the <see cref="LmsensorsSensorDataProvider"/> class.
-        /// </summary>
-        /// <param name="friendlyName">A user-friendly name for this sensor group.</param>
-        /// <param name="filterRegex">A regular expression to filter which sensors are included.
-        /// If null or empty, all sensors will be included.</param>
-        /// <param name="sensorNameOverrides">A dictionary to override raw sensor names with friendly names.</param>
-        public LmsensorsSensorDataProvider(string friendlyName, string filterRegex = null, Dictionary<string, string> sensorNameOverrides = null)
+        public LmsensorsSensorDataProvider(string friendlyName, List<string> provideSensors)
         {
-            FriendlyName = friendlyName;
-            _filterRegex = string.IsNullOrEmpty(filterRegex) ? null : filterRegex;
-            _sensorNameOverrides = sensorNameOverrides ?? new();
-            _sensorData = new();
-            _sensorData.Values = new();
+            FriendlyName = friendlyName ?? "";
+            _provideSensors = provideSensors;
+            _sensorData = new (string, float)[provideSensors.Count];
         }
 
-        public SensorData GetSensorData()
+        public bool GetSensorData(out (string, float)[] data)
         {      
             try
             {
@@ -55,6 +45,7 @@ namespace HwMonLinux
                     string line;
                     string currentChip = null;
 
+                    int i = 0;
                     while ((line = reader.ReadLine()) != null)
                     {
                         line = line.Trim();
@@ -80,40 +71,28 @@ namespace HwMonLinux
                             string sensorNameRaw = sensorMatch.Groups[1].Value.Trim();
                             string sensorValueRaw = sensorMatch.Groups[2].Value.Trim();
                             string fullSensorNameRaw = currentChip != null ? $"{currentChip}-{sensorNameRaw}" : sensorNameRaw;
-                            string finalSensorName = fullSensorNameRaw;
-
-                            //Console.WriteLine(fullSensorNameRaw);
-                            // Apply filter if one is provided
-                            if (_filterRegex != null && !Regex.IsMatch(fullSensorNameRaw, _filterRegex))
-                            {
-                                continue;
-                            }
-
-                            // Apply sensor name overrides
-                            if (_sensorNameOverrides.ContainsKey(fullSensorNameRaw))
-                            {
-                                finalSensorName = _sensorNameOverrides[fullSensorNameRaw];
-                            }
-                            else if (_sensorNameOverrides.ContainsKey(sensorNameRaw))
-                            {
-                                finalSensorName = _sensorNameOverrides[sensorNameRaw];
-                            }
 
                             if (float.TryParse(sensorValueRaw, NumberStyles.Float, CultureInfo.InvariantCulture, out float sensorValue))
                             {
-                                _sensorData.Values[finalSensorName] = sensorValue;
+                                if (_provideSensors.Contains(fullSensorNameRaw))
+                                {
+                                    _sensorData[i].Item1 = fullSensorNameRaw;
+                                    _sensorData[i].Item2 = sensorValue;
+                                    i++;
+                                }
                             }
-                            // You might want to handle other units or states differently
                         }
                     }
                 }
 
-                return _sensorData;
+                data = _sensorData;
+                return true;
             }
             catch (Exception ex)
             {
                 Console.WriteLine($"Error reading LMSensors data: {ex.Message}");
-                return null;
+                data = [];
+                return false;
             }
         }
     }
