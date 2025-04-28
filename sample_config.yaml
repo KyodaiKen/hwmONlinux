@@ -35,7 +35,7 @@ sensorProviders:
         nct6798-isa-0290.fan2: "Rad (RPM)"
         nct6798-isa-0290.fan7: "Pump (RPM)"
         nct6798-isa-0290.PCH_CHIP_TEMP: "PCH (°C)"
-        "coretemp-isa-000.Package id 0": "CPU Package Temperature (°C)"
+        "coretemp-isa-0000.Package id 0": "CPU Package Temperature (°C)"
         spd5118-i2c-14-51.temp1: "Memory DIMM A2 Temp (°C)"
         spd5118-i2c-14-53.temp1: "Memory DIMM B2 Temp (°C)"
   - type: "HwMonLinux.NvidiaSmiSensorDataProvider, HwmONlinuxServer"
