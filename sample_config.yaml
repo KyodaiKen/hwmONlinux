@@ -5,7 +5,30 @@ webServer:
 sensorData:
   dataRetentionSeconds: 120
 
+# List of available sensorProviders:
+# "HwMonLinux.AmdPackagePowerSensorDataProvider, HwmONlinuxServer", providerName: "cpu.power.amd.package"
+#   Uses the "/sys/class/hwmon" to gather data. The sensor name is {file name}.
+# "HwMonLinux.AmdCpuTemperatureSensorDataProvider, HwmONlinuxServer", providerName: "cpu.temperature.amd"
+#   Uses the "/sys/class/hwmon" to gather data. The sensor name is {file name}.
+# "HwMonLinux.CpuUtilizationSensorDataProvider, HwmONlinuxServer", providerName: "cpu.util"
+#   Uses "/proc/stat" to gather data. The sensor name anything starting with "cpu".
+# "HwMonLinux.DiskIoSensorDataProvider, HwmONlinuxServer", providerName: "io.disks"
+#   Uses "/proc/diskstats" to gather data. The sensor name is the device name of only mounted devices (also partitions if needed).
+# "HwMonLinux.IntelGpuSensorDataProvider, HwmONlinuxServer", providerName: "gpu.intel_gpu_top"
+#   Uses "intel_gpu_top -c -s 800", keeps it open to gather new data every 800ms. Sensor names are from the CSV header.
+# "HwMonLinux.IntelPackagePowerSensorDataProvider, HwmONlinuxServer", providerName: "cpu.power.intel.package"
+#   Uses "/sys/class/powercap/intel-rapl/intel-rapl:0/energy_uj" (configurable) and converts the joules from the last second to Watts. Sensor name is "last_second".
+# "HwMonLinux.LmsensorsSensorDataProvider, HwmONlinuxServer", providerName: "lmsensors"
+#   Uses the "sensors" command to gather data. The sensor name is {chip name}->{sensor name}.
+# "HwMonLinux.MemoryUtilizationSensorDataProvider, HwmONlinuxServer", providerName: "stats.memory"
+#   Uses the "/proc/meminfo" file to gather data. Sensor names are the sections in the file. But there are also added calculated sensors:  "MemUsed" and "SwapUsed".
+# "HwMonLinux.NetworkIoSensorDataProvider, HwmONlinuxServer", providerName: "io.network"
+#   Uses the "/proc/net/dev" file to gather data, computing the delta between readings. Sensor names: "{interface}.rx" and "{interface}.tx".
+# "HwMonLinux.NvidiaSmiSensorDataProvider, HwmONlinuxServer", providerName: "gpu.nvidia-smi"
+#   Uses "nvidia-smi" for gathering data. To get a list of supported sensors on your system, try to run: nvidia-smi --help-query-gpu
+
 sensorProviders:
+  # Personal fan controller made with an Arduino Nano. You can ignore this one.
   - type: "HwMonLinux.KKFC01SensorDataProvider, HwmONlinuxServer"
     config:
       friendlyName: "Fan Controller FC02"
@@ -113,9 +136,6 @@ sensorProviders:
         - "eno2.rx"
         - "eno2.tx"
       sensorLabels:
-        #The system adds Rx (MBit/s) or Tx (MBit/s), here. You need to specify this in the groups!
-        #sensorNameRx = "{sensorLabel} Rx (MBit/s)"
-        #sensorNameTx = "{sensorLabel} Tx (MBit/s)"
         eno1.rx: "10G NAS Rx (MBit/s)"
         eno1.tx: "10G NAS Tx (MBit/s)"
         eno2.rx: "FritzBox Rx (MBit/s)"
@@ -144,7 +164,7 @@ sensorProviders:
         "nvme3n1.w": "Games (MB/s)"
 
 sensorGroups:
-  #Sensor identifier: "{provierFriendlyName} {sensorName}"
+  #Sensor identifier: "{providerName}->{sensorName}"
   - name: "system"
     friendlyName: "System Temperatures & Fans"
     sensorIdentifiers:

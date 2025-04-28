@@ -14,69 +14,6 @@ namespace HwMonLinux
 
         private (string, float)[] _sensorData;
 
-        // A list of all possible nvidia-smi query options (as of a certain point).
-        // This list might need to be updated with newer driver versions.
-        private static readonly List<string> AllNvidiaSmiMetrics = [
-            "timestamp",
-            "name",
-            "pci.bus_id",
-            "driver_version",
-            "cuda_version",
-            "compute_mode",
-            "pstate",
-            "clocks.current.graphics",
-            "clocks.current.sm",
-            "clocks.current.mem",
-            "clocks.current.video",
-            "clocks.max.graphics",
-            "clocks.max.sm",
-            "clocks.max.mem",
-            "clocks.max.video",
-            "clocks.current.memory",
-            "power.management",
-            "power.draw",
-            "power.draw.instant",
-            "power.limit",
-            "power.default_limit",
-            "enforced.power.limit",
-            "temperature.gpu",
-            "temperature.memory",
-            "temperature.gpu.threshold.slowdown",
-            "temperature.gpu.threshold.shutdown",
-            "utilization.gpu",
-            "utilization.memory",
-            "utilization.encoder",
-            "utilization.decoder",
-            "utilization.ofa",
-            "ecc.mode.current",
-            "ecc.errors.corrected.total",
-            "ecc.errors.uncorrected.total",
-            "fan.speed",
-            "fan.pwm",
-            "memory.total",
-            "memory.free",
-            "memory.used",
-            "memory.reserved",
-            "mig.mode.current",
-            "mig.devices.count",
-            "vbios_version",
-            "serial",
-            "uuid",
-            "inforom.oem.tag",
-            "inforom.ecc.object",
-            "inforom.pwr_mgmt.object",
-            "display.mode",
-            "display.active",
-            "persistence_mode",
-            "gpu_virtualization_mode",
-            "total_cuda_cores",
-            "ofa.util",
-            "bar1.total",
-            "bar1.free",
-            "bar1.used"
-            // Add other metrics as needed based on nvidia-smi --help-query-gpu
-        ];
-
         public NvidiaSmiSensorDataProvider(string friendlyName, List<string> provideSensors)
         {
             FriendlyName = friendlyName;

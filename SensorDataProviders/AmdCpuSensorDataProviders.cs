@@ -78,7 +78,7 @@ namespace HwMonLinux
 
     public class AmdCpuTemperatureSensorDataProvider : ISensorDataProvider
     {
-        public string Name => "AmdCpuTemperature";
+        public string Name => "cpu.temperature.amd";
         public string FriendlyName { get; }
         private readonly string _tempFilePathPattern;
 
