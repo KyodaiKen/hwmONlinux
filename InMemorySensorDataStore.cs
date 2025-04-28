@@ -44,36 +44,25 @@ namespace HwMonLinux
                     {
                         for (int ps = 0; ps < providedData.Length; ps++)
                         {
-                            // if(_sensorIndex[p].Item2[s] == "eno1.tx")
-                            // {
-                            //     Console.WriteLine($"{_sensorIndex[p].Item2[s]} == {providedData[ps].Item1}");
-                            // }
                             if (_sensorIndex[p].Item2[s] == providedData[ps].Item1)
                             {
+                                // Set new value
+                                _data[p][s][_counters[p][s]].Item1 = DateTime.UtcNow;
+                                _data[p][s][_counters[p][s]].Item2 = providedData[s].Item2;
+
                                 if (_counters[p][s] == _retentionSeconds - 1)
                                 {
                                     // Shift array one to the left
                                     for (int v = 1; v < _retentionSeconds; v++)
                                     {
-                                        _data[p][s][v-1] = _data[p][s][v];
+                                        _data[p][s][v - 1] = _data[p][s][v];
                                     }
-                                
-                                    // Set new value
-                                    _data[p][s][_counters[p][s]].Item1 = DateTime.UtcNow;
-                                    _data[p][s][_counters[p][s]].Item2 = providedData[s].Item2;
                                 }
                                 else
                                 {
-                                    // Set new values
-                                    _data[p][s][_counters[p][s]].Item1 = DateTime.UtcNow;
-                                    _data[p][s][_counters[p][s]].Item2 = providedData[s].Item2;
-
                                     // Increment the counter
                                     _counters[p][s]++;
                                 }
-
-                                //Console.WriteLine($"{providerName}.{_sensorIndex[p].Item2[s]}.Count = {_counters[p][s]} | _retentionSeconds => {_retentionSeconds}");
-
                                 break;
                             }
                         }
