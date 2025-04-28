@@ -67,9 +67,18 @@ namespace HwMonLinux
             var providerConfig = providerDef.Config;
             Type type = Type.GetType(typeName);
             providedSensors = null;
-            labels = providerConfig.TryGetValue("sensorLabels", out var sensorLabelsObj) && sensorLabelsObj is Dictionary<object, object> rawLabels
-                ? rawLabels.ToDictionary(k => k.Key.ToString(), v => v.ToString() ?? "")
-                : new Dictionary<string, string>();
+            labels = new Dictionary<string, string>();
+
+            if (providerConfig.TryGetValue("sensorLabels", out var sensorLabelsObj) && sensorLabelsObj is Dictionary<object, object> rawLabels)
+            {
+                foreach (var entry in rawLabels)
+                {
+                    if (entry.Key != null)
+                    {
+                        labels[entry.Key.ToString()] = entry.Value?.ToString() ?? "";
+                    }
+                }
+            }
 
             // Capture the labels dictionary in a local variable
             var localLabels = labels;
@@ -152,7 +161,7 @@ namespace HwMonLinux
                             if (instance != null)
                             {
                                 providedSensors = foundProvidedSensorsList?.Select(sensorName => (sensorName, localLabels.TryGetValue(sensorName, out var label) ? label : sensorName)).ToArray();
-                                Console.WriteLine($"Loaded sensor provider: {instance.FriendlyName} ({instance.Name}) providing {providedSensors.Length} sensors.");
+                                Console.WriteLine($"Loaded sensor provider: {instance.FriendlyName} ({instance.Name}) providing sensors: {string.Join(", ", providedSensors?.Select(p => $"{p.Item1} (Label: {p.Item2})") ?? new string[0])}");
                                 return instance;
                             }
                             else

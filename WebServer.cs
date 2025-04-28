@@ -157,6 +157,7 @@ namespace HwMonLinux
                     var provider = _sensorDataProviders.FirstOrDefault(p => p.Name == providerInfo.Item1);
                     _jsonWriter.WritePropertyName(providerInfo.Item1); // Original Provider Name (for matching with groups)
                     _jsonWriter.WriteStartObject(); // Start of the sensor data for the provider
+                    _jsonWriter.WriteString("friendlyName", provider?.FriendlyName); // Add friendlyName
 
                     if (_sensorDataStore.GetSensorDataFromProvider(providerInfo.Item1, out var providerData, out var counters))
                     {
@@ -170,10 +171,8 @@ namespace HwMonLinux
                             _jsonWriter.WriteString("friendlyName", sensorLabel); // Add friendlyName for the sensor
                             _jsonWriter.WritePropertyName("data");
                             _jsonWriter.WriteStartArray(); // Start of the sensor data array
-
-                            int counter = counters[s]; // Get the current counter for this sensor directly
-
-                            for (int i = 0; i < counter; i++)
+                            //Console.WriteLine($"counters[s] => {counters[s]}");
+                            for (int i = 0; i < counters[s]; i++)
                             {
                                 _jsonWriter.WriteStartObject();
                                 _jsonWriter.WriteString("Timestamp", providerData[s][i].Item1.ToString("O"));

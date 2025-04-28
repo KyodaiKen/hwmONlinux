@@ -29,7 +29,7 @@ namespace HwMonLinux
                 for (int s = 0; s < _sensorIndex[p].Item2.Length; s++)
                 {
                     _data[p][s] = new (DateTime, float)[retentionSeconds];
-                    _counters[p][s] = 1;
+                    _counters[p][s] = 0;
                 }
             }
         }
@@ -50,25 +50,29 @@ namespace HwMonLinux
                             // }
                             if (_sensorIndex[p].Item2[s] == providedData[ps].Item1)
                             {
-                                if (_counters[p][s] == _retentionSeconds)
+                                if (_counters[p][s] == _retentionSeconds - 1)
                                 {
                                     // Shift array one to the left
                                     for (int v = 1; v < _retentionSeconds; v++)
                                     {
                                         _data[p][s][v-1] = _data[p][s][v];
                                     }
+                                
+                                    // Set new value
+                                    _data[p][s][_counters[p][s]].Item1 = DateTime.UtcNow;
+                                    _data[p][s][_counters[p][s]].Item2 = providedData[s].Item2;
                                 }
                                 else
                                 {
-                                    // Just increment the counter
+                                    // Set new values
+                                    _data[p][s][_counters[p][s]].Item1 = DateTime.UtcNow;
+                                    _data[p][s][_counters[p][s]].Item2 = providedData[s].Item2;
+
+                                    // Increment the counter
                                     _counters[p][s]++;
                                 }
 
-                                // Set new values
-                                _data[p][s][_counters[p][s]-1].Item1 = DateTime.UtcNow;
-                                _data[p][s][_counters[p][s]-1].Item2 = providedData[s].Item2;
-
-                                //Console.WriteLine($"{providerName}.{_sensorIndex[p].Item2[s]}.Count = {_counters[p][s]}");
+                                //Console.WriteLine($"{providerName}.{_sensorIndex[p].Item2[s]}.Count = {_counters[p][s]} | _retentionSeconds => {_retentionSeconds}");
 
                                 break;
                             }

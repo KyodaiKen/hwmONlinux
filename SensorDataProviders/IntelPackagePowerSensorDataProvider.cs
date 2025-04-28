@@ -53,7 +53,7 @@ namespace HwMonLinux
                             if (timeDiff.TotalSeconds > 0)
                             {
                                 // Convert microjoules to joules and divide by time in seconds to get Watts
-                                _sensorData[0].Item1 = "package.power";
+                                _sensorData[0].Item1 = "last_second";
                                 _sensorData[0].Item2 = (float)(energyDiff / timeDiff.TotalSeconds / 1_000_000.0);
                             }
                         }
