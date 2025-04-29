@@ -1,0 +1,186 @@
+[webServer]
+host = "*"
+port = 8085
+contentRoot = "./wwwroot"
+
+[sensorData]
+dataRetentionSeconds = 120
+
+# List of available sensorProviders:
+# "HwMonLinux.AmdPackagePowerSensorDataProvider, HwmONlinuxServer", providerName: "cpu.power.amd.package"
+#   Uses the "/sys/class/hwmon" to gather data. The sensor name is {file name}.
+# "HwMonLinux.AmdCpuTemperatureSensorDataProvider, HwmONlinuxServer", providerName: "cpu.temperature.amd"
+#   Uses the "/sys/class/hwmon" to gather data. The sensor name is {file name}.
+# "HwMonLinux.CpuUtilizationSensorDataProvider, HwmONlinuxServer", providerName: "cpu.util"
+#   Uses "/proc/stat" to gather data. The sensor name anything starting with "cpu".
+# "HwMonLinux.DiskIoSensorDataProvider, HwmONlinuxServer", providerName: "io.disks"
+#   Uses "/proc/diskstats" to gather data. The sensor name is the device name of only mounted devices (also partitions if needed).
+# "HwMonLinux.IntelGpuSensorDataProvider, HwmONlinuxServer", providerName: "gpu.intel_gpu_top"
+#   Uses "intel_gpu_top -c -s 800", keeps it open to gather new data every 800ms. Sensor names are from the CSV header.
+# "HwMonLinux.IntelPackagePowerSensorDataProvider, HwmONlinuxServer", providerName: "cpu.power.intel.package"
+#   Uses "/sys/class/powercap/intel-rapl/intel-rapl:0/energy_uj" (configurable) and converts the joules from the last second to Watts. Sensor name is "last_second".
+# "HwMonLinux.LmsensorsSensorDataProvider, HwmONlinuxServer", providerName: "lmsensors"
+#   Uses the "sensors" command to gather data. The sensor name is {chip name}->{sensor name}.
+# "HwMonLinux.MemoryUtilizationSensorDataProvider, HwmONlinuxServer", providerName: "stats.memory"
+#   Uses the "/proc/meminfo" file to gather data. Sensor names are the sections in the file. But there are also added calculated sensors:  "MemUsed" and "SwapUsed".
+# "HwMonLinux.NetworkIoSensorDataProvider, HwmONlinuxServer", providerName: "io.network"
+#   Uses the "/proc/net/dev" file to gather data, computing the delta between readings. Sensor names: "{interface}.rx" and "{interface}.tx".
+# "HwMonLinux.NvidiaSmiSensorDataProvider, HwmONlinuxServer", providerName: "gpu.nvidia-smi"
+#   Uses "nvidia-smi" for gathering data. To get a list of supported sensors on your system, try to run: nvidia-smi --help-query-gpu
+
+[[sensorProviders]]
+type = "HwMonLinux.KKFC01SensorDataProvider, HwmONlinuxServer"
+
+  [sensorProviders.config]
+  friendlyName = "Fan Controller FC02"
+  portName = "/dev/ttyUSB0"
+  baudRate = 115200
+  queryCommand = "bs"
+  identificationString = "KyoudaiKen FC02"
+  provideSensors = ["temp.water", "temp.case", "temp.ambient"]
+
+    [sensorProviders.config.sensorLabels]
+    "temp.water" = "Water Temperature (°C)"
+    "temp.case" = "Case Temperature (°C)"
+    "temp.ambient" = "Ambient Temperature (°C)"
+
+[[sensorProviders]]
+type = "HwMonLinux.LmsensorsSensorDataProvider, HwmONlinuxServer"
+
+  [sensorProviders.config]
+  friendlyName = "LMSensors"
+  provideSensors = ["nct6798-isa-0290.fan2", "nct6798-isa-0290.fan7", "nct6798-isa-0290.PCH_CHIP_TEMP", "coretemp-isa-0000.Package id 0", "spd5118-i2c-14-51.temp1", "spd5118-i2c-14-53.temp1"]
+
+    [sensorProviders.config.sensorLabels]
+    "nct6798-isa-0290.fan2" = "Rad (RPM)"
+    "nct6798-isa-0290.fan7" = "Pump (RPM)"
+    "nct6798-isa-0290.PCH_CHIP_TEMP" = "PCH (°C)"
+    "coretemp-isa-0000.Package id 0" = "CPU Package Temperature (°C)"
+    "spd5118-i2c-14-51.temp1" = "Memory DIMM A2 Temp (°C)"
+    "spd5118-i2c-14-53.temp1" = "Memory DIMM B2 Temp (°C)"
+
+[[sensorProviders]]
+type = "HwMonLinux.NvidiaSmiSensorDataProvider, HwmONlinuxServer"
+
+  [sensorProviders.config]
+  friendlyName = "NVidia RTX 3090"
+  provideSensors = ["temperature.gpu", "utilization.gpu", "utilization.memory", "utilization.encoder", "utilization.decoder", "utilization.ofa", "memory.used", "power.draw.instant", "clocks.current.graphics", "clocks.current.memory"]
+
+    [sensorProviders.config.sensorLabels]
+    "temperature.gpu" = "Core Temperature (°C)"
+    "utilization.gpu" = "Core Load (%)"
+    "utilization.memory" = "Memory Controller Load (%)"
+    "utilization.encoder" = "Encoder Load (%)"
+    "utilization.decoder" = "Decoder Load (%)"
+    "utilization.ofa" = "Optical Flow Accel. Load (%)"
+    "memory.used" = "Memory Used (MB)"
+    "power.draw.instant" = "Power (W)"
+    "clocks.current.graphics" = "Graphics Clock (MHz)"
+    "clocks.current.memory" = "Memory Clock (MHz)"
+
+[[sensorProviders]]
+type = "HwMonLinux.IntelPackagePowerSensorDataProvider, HwmONlinuxServer"
+
+  [sensorProviders.config]
+  friendlyName = "Intel Core i9-13900KS"
+  energyFilePath = "/sys/class/powercap/intel-rapl/intel-rapl:0/energy_uj"
+  provideSensors = ["last_second"]
+
+    [sensorProviders.config.sensorLabels]
+    "last_second" = "Package Power (W)"
+
+[[sensorProviders]]
+type = "HwMonLinux.CpuUtilizationSensorDataProvider, HwmONlinuxServer"
+
+  [sensorProviders.config]
+  friendlyName = "CPU Util"
+  provideSensors = ["overall"]
+
+    [sensorProviders.config.sensorLabels]
+    "overall" = "Overall Utilization (%)"
+
+[[sensorProviders]]
+type = "HwMonLinux.MemoryUtilizationSensorDataProvider, HwmONlinuxServer"
+
+  [sensorProviders.config]
+  friendlyName = "System Memory"
+  provideSensors = ["MemUsed", "SwapUsed"]
+
+    [sensorProviders.config.sensorLabels]
+    "MemUsed" = "Memory Used (GB)"
+    "SwapUsed" = "Swap Used (GB)"
+
+[[sensorProviders]]
+type = "HwMonLinux.IntelGpuSensorDataProvider, HwmONlinuxServer"
+
+  [sensorProviders.config]
+  friendlyName = "Intel iGPU"
+  provideSensors = ["Freq MHz req", "Power W gpu", "RCS %", "BCS %", "VCS %", "VECS %"]
+
+    [sensorProviders.config.sensorLabels]
+    "Freq MHz req" = "GPU Frequency (MHz)"
+    "Power W gpu" = "GPU Power (W)"
+    "RCS %" = "GPU Render/3D Utilization (%)"
+    "BCS %" = "GPU Blitter Utilization (%)"
+    "VCS %" = "GPU Video Engine Utilization (%)"
+    "VECS %" = "GPU Video Prostproc Utilization (%)"
+
+[[sensorProviders]]
+type = "HwMonLinux.NetworkIoSensorDataProvider, HwmONlinuxServer"
+
+  [sensorProviders.config]
+  friendlyName = "Network I/O"
+  provideSensors = ["eno1.rx", "eno1.tx", "eno2.rx", "eno2.tx"]
+
+    [sensorProviders.config.sensorLabels]
+    eno1.rx = "10G NAS Rx (MBit/s)"
+    eno1.tx = "10G NAS Tx (MBit/s)"
+    eno2.rx = "FritzBox Rx (MBit/s)"
+    eno2.tx = "FritzBox Tx (MBit/s)"
+
+[[sensorProviders]]
+type = "HwMonLinux.DiskIoSensorDataProvider, HwmONlinuxServer"
+
+  [sensorProviders.config]
+  friendlyName = "Disk I/O"
+  provideSensors = ["nvme1n1.r", "nvme1n1.w", "nvme0n1.r", "nvme0n1.w", "nvme3n1.r", "nvme3n1.w", "nvme2n1.r", "nvme2n1.w"]
+
+    [sensorProviders.config.sensorLabels]
+    "nvme0n1.r" = "Windows Read (MB/s)"
+    "nvme0n1.w" = "Windows (MB/s)"
+    "nvme1n1.r" = "Data (MB/s)"
+    "nvme1n1.w" = "Data (MB/s)"
+    "nvme2n1.r" = "Fedora (MB/s)"
+    "nvme2n1.w" = "Fedora (MB/s)"
+    "nvme3n1.r" = "Games (MB/s)"
+    "nvme3n1.w" = "Games (MB/s)"
+
+[[sensorGroups]]
+name = "system"
+friendlyName = "System Temperatures & Fans"
+sensorIdentifiers = ["fan.controller.KKFC01->temp.water", "fan.controller.KKFC01->temp.case", "fan.controller.KKFC01->temp.ambient", "lmsensors->spd5118-i2c-14-51.temp1", "lmsensors->spd5118-i2c-14-53.temp1", "lmsensors->nct6798-isa-0290.PCH_CHIP_TEMP", "lmsensors->nct6798-isa-0290.fan2", "lmsensors->nct6798-isa-0290.fan7"]
+
+[[sensorGroups]]
+name = "cpu"
+friendlyName = "Intel Core i9-13900KS CPU"
+sensorIdentifiers = ["cpu.util->overall", "cpu.power.intel.package->last_second", "lmsensors->coretemp-isa-0000.Package id 0", "stats.memory->MemUsed", "stats.memory->SwapUsed"]
+
+[[sensorGroups]]
+name = "igpu"
+friendlyName = "Intel Core i9-13900KS iGPU"
+sensorIdentifiers = ["gpu.intel_gpu_top->RCS %", "gpu.intel_gpu_top->BCS %", "gpu.intel_gpu_top->VCS %", "gpu.intel_gpu_top->VECS %", "gpu.intel_gpu_top->Freq MHz req", "gpu.intel_gpu_top->Power W gpu"]
+
+[[sensorGroups]]
+name = "gpu"
+friendlyName = "NVidia RTX 3090"
+sensorIdentifiers = ["gpu.nvidia-smi->temperature.gpu", "gpu.nvidia-smi->utilization.gpu", "gpu.nvidia-smi->utilization.memory", "gpu.nvidia-smi->utilization.encoder", "gpu.nvidia-smi->utilization.decoder", "gpu.nvidia-smi->utilization.ofa", "gpu.nvidia-smi->memory.used", "gpu.nvidia-smi->power.draw.instant", "gpu.nvidia-smi->clocks.current.graphics", "gpu.nvidia-smi->clocks.current.memory"]
+
+[[sensorGroups]]
+name = "net"
+friendlyName = "Network I/O"
+sensorIdentifiers = ["io.network->eno1.rx", "io.network->eno1.tx", "io.network->eno2.rx", "io.network->eno2.tx"]
+
+[[sensorGroups]]
+name = "disk"
+friendlyName = "Disk I/O"
+sensorIdentifiers = ["io.disks->nvme0n1.r", "io.disks->nvme0n1.w", "io.disks->nvme1n1.r", "io.disks->nvme1n1.w", "io.disks->nvme2n1.r", "io.disks->nvme2n1.w", "io.disks->nvme3n1.r", "io.disks->nvme3n1.w"]

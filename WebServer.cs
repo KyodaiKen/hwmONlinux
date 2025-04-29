@@ -20,7 +20,13 @@ namespace HwMonLinux
         private readonly List<ISensorDataProvider> _sensorDataProviders;
         private readonly List<SensorGroupDefinition> _sensorGroups;
         private readonly (string, (string, string)[])[] _sensorIndex; // Receive the sensor index (originalName, label)
-        private readonly Dictionary<string, Dictionary<string, string>> _sensorLabels; // ProviderName -> (OriginalName -> Label)
+
+        private readonly byte[] notFoundErrHTML = { 0x3C, 0x68, 0x74, 0x6D, 0x6C, 0x3E, 0x3C, 0x62, 0x6F,
+                                                    0x64, 0x79, 0x3E, 0x3C, 0x68, 0x31, 0x3E, 0x34, 0x30,
+                                                    0x34, 0x20, 0x4E, 0x6F, 0x74, 0x20, 0x46, 0x6F, 0x75,
+                                                    0x6E, 0x64, 0x3C, 0x2F, 0x68, 0x31, 0x3E, 0x3C, 0x2F,
+                                                    0x62, 0x6F, 0x64, 0x79, 0x3E, 0x3C, 0x2F, 0x68, 0x74,
+                                                    0x6D, 0x6C, 0x3E };
 
         private CancellationTokenSource _cts;
 
@@ -28,14 +34,13 @@ namespace HwMonLinux
         private readonly ArrayBufferWriter<byte> _bufferWriter = new();
         private Utf8JsonWriter _jsonWriter;
 
-        public WebServer(string host, int port, string contentRoot, int sensorRetentionSeconds, List<ISensorDataProvider> sensorDataProviders, List<SensorGroupDefinition> sensorGroups, (string, (string, string)[])[] sensorIndex, Dictionary<string, Dictionary<string, string>> sensorLabels)
+        public WebServer(string host, int port, string contentRoot, int sensorRetentionSeconds, List<ISensorDataProvider> sensorDataProviders, List<SensorGroupDefinition> sensorGroups, (string, (string, string)[])[] sensorIndex)
         {
             _listener.Prefixes.Add($"http://{host}:{port}/");
             _contentRoot = contentRoot;
             _sensorDataProviders = sensorDataProviders;
             _sensorGroups = sensorGroups;
             _sensorIndex = sensorIndex;
-            _sensorLabels = sensorLabels;
             _sensorDataStore = new InMemorySensorDataStore(sensorRetentionSeconds, _sensorIndex.Select(p => (p.Item1, p.Item2.Select(l => l.Item1).ToArray())).ToArray()); // Initialize data store with original names
         }
 
@@ -134,10 +139,8 @@ namespace HwMonLinux
             else
             {
                 response.StatusCode = (int)HttpStatusCode.NotFound;
-                string notFoundHtml = "<html><body><h1>404 Not Found</h1></body></html>";
-                byte[] buffer = Encoding.UTF8.GetBytes(notFoundHtml);
-                response.ContentLength64 = buffer.Length;
-                await response.OutputStream.WriteAsync(buffer, 0, buffer.Length);
+                response.ContentLength64 = notFoundErrHTML.Length;
+                await response.OutputStream.WriteAsync(notFoundErrHTML, 0, notFoundErrHTML.Length);
             }
         }
 
@@ -147,8 +150,7 @@ namespace HwMonLinux
             response.ContentType = "application/json";
             response.StatusCode = (int)HttpStatusCode.OK;
 
-            _bufferWriter.Clear();
-            using (_jsonWriter = new Utf8JsonWriter(_bufferWriter))
+            using (_jsonWriter = new Utf8JsonWriter(response.OutputStream))
             {
                 _jsonWriter.WriteStartObject();
                 _jsonWriter.WritePropertyName("providers");
@@ -204,9 +206,6 @@ namespace HwMonLinux
 
                 _jsonWriter.WriteEndObject();
                 await _jsonWriter.FlushAsync();
-                byte[] buffer = _bufferWriter.WrittenSpan.ToArray();
-                response.ContentLength64 = buffer.Length;
-                await response.OutputStream.WriteAsync(buffer, 0, buffer.Length);
             }
         }
 

@@ -22,18 +22,18 @@ namespace HwMonLinux
             // Create a list of sensor data providers and the sensor index
             var sensorDataProviders = new List<ISensorDataProvider>();
             var sensorIndexBuilder = new List<(string, (string, string)[])>();
-            var allSensorLabels = new Dictionary<string, Dictionary<string, string>>(); // Store labels per provider
+            //var allSensorLabels = new Dictionary<string, Dictionary<string, string>>(); // Store labels per provider
 
             if (config.SensorProviders != null)
             {
                 foreach (var providerDef in config.SensorProviders)
                 {
-                    ISensorDataProvider provider = LoadSensorProvider(providerDef, out (string, string)[] providedSensors, out Dictionary<string, string> labels);
+                    ISensorDataProvider provider = LoadSensorProvider(providerDef, out (string, string)[] providedSensors);
                     if (provider != null && providedSensors != null && providedSensors.Length > 0)
                     {
                         sensorDataProviders.Add(provider);
                         sensorIndexBuilder.Add((provider.Name, providedSensors));
-                        allSensorLabels[provider.Name] = labels;
+                        //allSensorLabels[provider.Name] = labels;
                     }
                     else if (provider != null)
                     {
@@ -50,8 +50,7 @@ namespace HwMonLinux
                 config.SensorData.DataRetentionSeconds,
                 sensorDataProviders,
                 config.SensorGroups,
-                sensorIndexBuilder.ToArray(), // Pass the sensor index
-                allSensorLabels // Pass the sensor labels
+                sensorIndexBuilder.ToArray() // Pass the sensor index
             );
             await webServer.StartAsync();
 
@@ -61,27 +60,24 @@ namespace HwMonLinux
             await webServer.StopAsync();
         }
 
-        static ISensorDataProvider LoadSensorProvider(SensorProviderDefinition providerDef, out (string, string)[] providedSensors, out Dictionary<string, string> labels)
+        static ISensorDataProvider LoadSensorProvider(SensorProviderDefinition providerDef, out (string, string)[] providedSensors)
         {
             string typeName = providerDef.Type;
             var providerConfig = providerDef.Config;
             Type type = Type.GetType(typeName);
             providedSensors = null;
-            labels = new Dictionary<string, string>();
+            var localLabels = new Dictionary<string, string>();
 
             if (providerConfig.TryGetValue("sensorLabels", out var sensorLabelsObj) && sensorLabelsObj is Dictionary<object, object> rawLabels)
             {
                 foreach (var entry in rawLabels)
+                {
+                    if (entry.Key != null)
                     {
-                        if (entry.Key != null)
-                        {
-                            labels[entry.Key.ToString()] = entry.Value?.ToString() ?? "";
-                        }
+                        localLabels[entry.Key.ToString()] = entry.Value?.ToString() ?? "";
                     }
+                }
             }
-
-            // Capture the labels dictionary in a local variable
-            var localLabels = labels;
 
             if (type != null && typeof(ISensorDataProvider).IsAssignableFrom(type))
             {
@@ -161,7 +157,8 @@ namespace HwMonLinux
                             if (instance != null)
                             {
                                 providedSensors = foundProvidedSensorsList?.Select(sensorName => (sensorName, localLabels.TryGetValue(sensorName, out var label) ? label : sensorName)).ToArray();
-                                Console.WriteLine($"Loaded sensor provider: {instance.FriendlyName} ({instance.Name}) providing sensors: {string.Join(", ", providedSensors?.Select(p => $"{p.Item1} (Label: {p.Item2})") ?? new string[0])}");
+                                Console.WriteLine($"Loaded sensor provider: {instance.FriendlyName} ({instance.Name}) providing sensors: {string.Join(", ", providedSensors?.Select(p => $"{p.Item1} (Label: {p.Item2})") ?? Array.Empty<string>())}");
+                                constructorArgs.Clear();
                                 return instance;
                             }
                             else
@@ -173,10 +170,8 @@ namespace HwMonLinux
                         {
                             Console.WriteLine($"Error creating instance of provider '{typeName}' using constructor: {constructor}. Exception: {ex.Message}");
                         }
-                        // If instance creation fails, we continue to the next constructor
                     }
                 }
-
                 Console.WriteLine($"Error: No suitable constructor found for provider '{typeName}' that could be satisfied with the provided configuration.");
             }
             else
