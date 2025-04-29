@@ -5,32 +5,44 @@ using YamlDotNet.Serialization.NamingConventions;
 
 namespace HwMonLinux
 {
-    public class SensorProviderDefinition
+    [YamlStaticContext]
+    public class SensorProviderDefinition : StaticContext
     {
         public required string Type { get; set; }
         public required Dictionary<string, object> Config { get; set; }
     }
 
-    public class SensorGroupDefinition
+    [YamlStaticContext]
+    public class SensorGroupDefinition : StaticContext
     {
         public required string Name { get; set; }
         public required string FriendlyName { get; set; }
         public required List<string> SensorIdentifiers { get; set; }
     }
 
-    public class WebServerConfig
+    [YamlStaticContext]
+    public class WebServerConfig : StaticContext
     {
         public required string Host { get; set; }
         public required int Port { get; set; }
         public required string ContentRoot { get; set; }
     }
 
-    public class SensorDataConfig
+    [YamlStaticContext]
+    public class SensorDataConfig : StaticContext
     {
         public required int DataRetentionSeconds { get; set; }
     }
 
-    public class Configuration
+    [YamlStaticContext]
+    [YamlSerializable(typeof(Configuration))]
+    [YamlSerializable(typeof(SensorProviderDefinition))]
+    [YamlSerializable(typeof(SensorGroupDefinition))]
+    [YamlSerializable(typeof(WebServerConfig))]
+    [YamlSerializable(typeof(SensorDataConfig))]
+    public partial class YamlStaticContext : StaticContext { }
+
+    public partial class Configuration
     {
         public required WebServerConfig WebServer { get; set; }
         public required SensorDataConfig SensorData { get; set; }
@@ -44,7 +56,7 @@ namespace HwMonLinux
                 throw new FileNotFoundException($"Configuration file not found at: {path}");
             }
 
-            var deserializer = new DeserializerBuilder()
+            var deserializer = new StaticDeserializerBuilder(new YamlStaticContext())
                 .WithNamingConvention(CamelCaseNamingConvention.Instance)
                 .Build();
 

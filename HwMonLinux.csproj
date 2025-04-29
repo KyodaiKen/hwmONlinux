@@ -5,16 +5,17 @@
     <TargetFramework>net8.0</TargetFramework>
     <Nullable>enable</Nullable>
     <RuntimeIdentifier>linux-x64</RuntimeIdentifier>
-    <PublishSingleFile>true</PublishSingleFile>
+    <PublishSingleFile>false</PublishSingleFile>
     <SelfContained>false</SelfContained>
     <PublishDir>bin/Release/net8.0/linux-x64/publish/</PublishDir>
     <AssemblyName>HwmONlinuxServer</AssemblyName>
-    <PublishAot>false</PublishAot>
+    <PublishAot>true</PublishAot>
     <PublishReadyToRun>false</PublishReadyToRun>
   </PropertyGroup>
 
   <ItemGroup>
     <PackageReference Include="System.IO.Ports" Version="9.0.4" />
+    <PackageReference Include="Vecc.YamlDotNet.Analyzers.StaticGenerator" Version="16.3.0" />
     <PackageReference Include="YamlDotNet" Version="16.3.0" />
   </ItemGroup>
 
