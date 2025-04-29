@@ -3,8 +3,6 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
-using System.Text.RegularExpressions;
-using System.Threading.Tasks;
 
 namespace HwMonLinux
 {
@@ -27,6 +25,7 @@ namespace HwMonLinux
             FriendlyName = friendlyName;
             _provideSensors = provideSensors;
             _networkInterfaces = GetActiveEthernetInterfaces();
+            _networkStats = [];
             _sensorData = new (string, float)[_provideSensors.Count * 2];
         }
 
@@ -97,7 +96,7 @@ namespace HwMonLinux
 
         private void ReadNetworkStats()
         {
-            _networkStats ??= new();
+            _networkStats.Clear();
             try
             {
                 var procNetDev = File.ReadAllLines("/proc/net/dev");

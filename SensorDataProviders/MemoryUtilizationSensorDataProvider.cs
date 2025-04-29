@@ -48,8 +48,9 @@ namespace HwMonLinux
 
                         // Parse metric value
                         TryParseKbValue(line, out long value);
-                        
-                        if(_provideSensors.Contains(metric)) {
+
+                        if (_provideSensors.Contains(metric))
+                        {
                             // Output
                             _sensorData[i].Item1 = metric;
                             _sensorData[i].Item2 = (float)Math.Round((double)value / (1024 * 1024), 2);
@@ -57,52 +58,52 @@ namespace HwMonLinux
                         }
 
                         switch (metric)
-                        {
-                            case "MemTotal":
-                                totalMemoryKb = value;
-                                break;
-                            case "MemFree":
-                                freeMemoryKb = value;
-                                break;
-                            case "Buffers":
-                                buffersKb = value;
-                                break;
-                            case "Cached":
-                                cachedKb = value;
-                                usedMemoryKb = totalMemoryKb - freeMemoryKb - buffersKb - cachedKb;
-                                if (_provideSensors.Contains("MemUsed"))
-                                {
-                                    _sensorData[i].Item1 = "MemUsed";
-                                    _sensorData[i].Item2 = (float)Math.Round((double)usedMemoryKb / (1024 * 1024), 2);
-                                    i++;
-                                }
-                                if (_provideSensors.Contains("MemUtil%"))
-                                {
-                                    _sensorData[i].Item1 = "MemUtil%";
-                                    _sensorData[i].Item2 = (float)Math.Round((double)usedMemoryKb / totalMemoryKb * 100, 2);
-                                    i++;
-                                }
-                                break;
-                            case "SwapTotal":
-                                swapTotalKb = value;
-                                break;
-                            case "SwapFree":
-                                swapFreeKb = value;
-                                usedSwapKb = swapTotalKb - swapFreeKb;
-                                if (_provideSensors.Contains("SwapUsed"))
-                                {
-                                    _sensorData[i].Item1 = "SwapUsed";
-                                    _sensorData[i].Item2 = (float)Math.Round((double)usedSwapKb / (1024 * 1024), 2);
-                                    i++;
-                                }
-                                if (_provideSensors.Contains("SwapUtil%"))
-                                {
-                                    _sensorData[i].Item1 = "SwapUtil%";
-                                    _sensorData[i].Item2 = (float)Math.Round((double)usedSwapKb / swapTotalKb * 100, 2);
-                                    i++;
-                                }
-                                break;
-                        }
+                            {
+                                case "MemTotal":
+                                    totalMemoryKb = value;
+                                    break;
+                                case "MemFree":
+                                    freeMemoryKb = value;
+                                    break;
+                                case "Buffers":
+                                    buffersKb = value;
+                                    break;
+                                case "Cached":
+                                    cachedKb = value;
+                                    usedMemoryKb = totalMemoryKb - freeMemoryKb - buffersKb - cachedKb;
+                                    if (_provideSensors.Contains("MemUsed"))
+                                    {
+                                        _sensorData[i].Item1 = "MemUsed";
+                                        _sensorData[i].Item2 = (float)Math.Round((double)usedMemoryKb / (1024 * 1024), 2);
+                                        i++;
+                                    }
+                                    if (_provideSensors.Contains("MemUtil%"))
+                                    {
+                                        _sensorData[i].Item1 = "MemUtil%";
+                                        _sensorData[i].Item2 = (float)Math.Round((double)usedMemoryKb / totalMemoryKb * 100, 2);
+                                        i++;
+                                    }
+                                    break;
+                                case "SwapTotal":
+                                    swapTotalKb = value;
+                                    break;
+                                case "SwapFree":
+                                    swapFreeKb = value;
+                                    usedSwapKb = swapTotalKb - swapFreeKb;
+                                    if (_provideSensors.Contains("SwapUsed"))
+                                    {
+                                        _sensorData[i].Item1 = "SwapUsed";
+                                        _sensorData[i].Item2 = (float)Math.Round((double)usedSwapKb / (1024 * 1024), 2);
+                                        i++;
+                                    }
+                                    if (_provideSensors.Contains("SwapUtil%"))
+                                    {
+                                        _sensorData[i].Item1 = "SwapUtil%";
+                                        _sensorData[i].Item2 = (float)Math.Round((double)usedSwapKb / swapTotalKb * 100, 2);
+                                        i++;
+                                    }
+                                    break;
+                            }
                     }
                 }
                 catch (Exception ex)

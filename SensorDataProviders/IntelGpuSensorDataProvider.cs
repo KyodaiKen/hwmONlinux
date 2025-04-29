@@ -34,12 +34,12 @@ namespace HwMonLinux
             _provideSensors = provideSensors;
             _sensorData = new (string, float)[_provideSensors.Count];
             _outputBuffer = new byte[4096]; // Initial buffer size
+            _process = new Process();
             StartIntelGpuTop();
         }
 
         private void StartIntelGpuTop()
         {
-            _process = new Process();
             _process.StartInfo.FileName = "/usr/bin/intel_gpu_top"; // Adjust path if necessary
             _process.StartInfo.Arguments = "-c -s 950"; // Request CSV and set interval to 950ms
             _process.StartInfo.RedirectStandardOutput = true;

@@ -51,7 +51,7 @@ public bool GetSensorData(out (string, float)[] data)
         using (var reader = new StringReader(output))
         {
             string line;
-            string currentChip = null;
+            string currentChip = "";
 
             while ((line = reader.ReadLine()) != null)
             {
