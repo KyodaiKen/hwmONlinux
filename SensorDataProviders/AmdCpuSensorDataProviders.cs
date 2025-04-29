@@ -70,7 +70,7 @@ namespace HwMonLinux
             catch (Exception ex)
             {
                 Console.WriteLine($"Error reading AMD package power data from '{_powerFilePath}': {ex.Message}");
-                data = [];
+                data = Array.Empty<(string, float)>();
                 return false;
             }
         }
@@ -129,7 +129,7 @@ namespace HwMonLinux
             catch (Exception ex)
             {
                 Console.WriteLine($"Error reading AMD CPU temperature data from '{_tempFilePathPattern}': {ex.Message}");
-                data = [];
+                data = Array.Empty<(string, float)>();
                 return false;
             }
         }

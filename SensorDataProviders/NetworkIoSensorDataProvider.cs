@@ -25,7 +25,7 @@ namespace HwMonLinux
             FriendlyName = friendlyName;
             _provideSensors = provideSensors;
             _networkInterfaces = GetActiveEthernetInterfaces();
-            _networkStats = [];
+            _networkStats = new();
             _sensorData = new (string, float)[_provideSensors.Count * 2];
         }
 
@@ -43,7 +43,7 @@ namespace HwMonLinux
                         interfaces.Add(parts[0]);
                     }
                 }
-                procNetDev = [];
+                procNetDev = null;
             }
             catch (Exception ex)
             {
@@ -111,7 +111,7 @@ namespace HwMonLinux
                         _networkStats[interfaceName] = (receivedBytes, transmittedBytes);
                     }
                 }
-                procNetDev = [];
+                procNetDev = null;
             }
             catch (Exception ex)
             {

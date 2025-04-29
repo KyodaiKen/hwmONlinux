@@ -22,84 +22,84 @@ namespace HwMonLinux
             _sensorData = new (string, float)[provideSensors.Count];
         }
 
-public bool GetSensorData(out (string, float)[] data)
-{
-    try
-    {
-        string output;
-        using (var process = new Process())
+        public bool GetSensorData(out (string, float)[] data)
         {
-            process.StartInfo.FileName = "sensors";
-            process.StartInfo.UseShellExecute = false;
-            process.StartInfo.RedirectStandardOutput = true;
-            process.StartInfo.CreateNoWindow = true;
-
-            process.Start();
-            output = process.StandardOutput.ReadToEnd();
-            process.WaitForExit();
-        }
-
-        // Initialize a new sensor data array for each read to avoid potential issues
-        _sensorData = new (string, float)[_provideSensors.Count];
-        // Initialize all elements to default values
-        for (int k = 0; k < _sensorData.Length; k++)
-        {
-            _sensorData[k].Item1 = _provideSensors[k]; // Initialize with the expected name
-            _sensorData[k].Item2 = float.NaN; // Initialize value to NaN or a default indicating no reading yet
-        }
-
-        using (var reader = new StringReader(output))
-        {
-            string line;
-            string currentChip = "";
-
-            while ((line = reader.ReadLine()) != null)
+            try
             {
-                line = line.Trim();
-
-                // Identify spd memory chip names
-                if (Regex.IsMatch(line, @"^spd\d+-[a-zA-Z0-9]+-\d+-\d+$"))
+                string output;
+                using (var process = new Process())
                 {
-                    currentChip = line;
-                    continue;
+                    process.StartInfo.FileName = "sensors";
+                    process.StartInfo.UseShellExecute = false;
+                    process.StartInfo.RedirectStandardOutput = true;
+                    process.StartInfo.CreateNoWindow = true;
+
+                    process.Start();
+                    output = process.StandardOutput.ReadToEnd();
+                    process.WaitForExit();
                 }
 
-                // Identify other chip names
-                if (Regex.IsMatch(line, @"^[a-zA-Z0-9]+-[a-zA-Z0-9]+-\d+$"))
+                // Initialize a new sensor data array for each read to avoid potential issues
+                _sensorData = new (string, float)[_provideSensors.Count];
+                // Initialize all elements to default values
+                for (int k = 0; k < _sensorData.Length; k++)
                 {
-                    currentChip = line;
-                    continue;
+                    _sensorData[k].Item1 = _provideSensors[k]; // Initialize with the expected name
+                    _sensorData[k].Item2 = float.NaN; // Initialize value to NaN or a default indicating no reading yet
                 }
 
-                // Identify sensor readings
-                Match sensorMatch = Regex.Match(line, @"^(.+?):\s+([+-]?\d+\.?\d*).+");
-                if (sensorMatch.Success)
+                using (var reader = new StringReader(output))
                 {
-                    string sensorNameRaw = sensorMatch.Groups[1].Value.Trim();
-                    string sensorValueRaw = sensorMatch.Groups[2].Value.Trim();
-                    string fullSensorNameRaw = currentChip != null ? $"{currentChip}.{sensorNameRaw}" : sensorNameRaw;
+                    string line;
+                    string currentChip = "";
 
-                    int index = _provideSensors.IndexOf(fullSensorNameRaw);
-                    if (index != -1)
+                    while ((line = reader.ReadLine()) != null)
                     {
-                        if (float.TryParse(sensorValueRaw, NumberStyles.Float, CultureInfo.InvariantCulture, out float sensorValue))
+                        line = line.Trim();
+
+                        // Identify spd memory chip names
+                        if (Regex.IsMatch(line, @"^spd\d+-[a-zA-Z0-9]+-\d+-\d+$"))
                         {
-                            _sensorData[index].Item2 = sensorValue;
+                            currentChip = line;
+                            continue;
+                        }
+
+                        // Identify other chip names
+                        if (Regex.IsMatch(line, @"^[a-zA-Z0-9]+-[a-zA-Z0-9]+-\d+$"))
+                        {
+                            currentChip = line;
+                            continue;
+                        }
+
+                        // Identify sensor readings
+                        Match sensorMatch = Regex.Match(line, @"^(.+?):\s+([+-]?\d+\.?\d*).+");
+                        if (sensorMatch.Success)
+                        {
+                            string sensorNameRaw = sensorMatch.Groups[1].Value.Trim();
+                            string sensorValueRaw = sensorMatch.Groups[2].Value.Trim();
+                            string fullSensorNameRaw = currentChip != null ? $"{currentChip}.{sensorNameRaw}" : sensorNameRaw;
+
+                            int index = _provideSensors.IndexOf(fullSensorNameRaw);
+                            if (index != -1)
+                            {
+                                if (float.TryParse(sensorValueRaw, NumberStyles.Float, CultureInfo.InvariantCulture, out float sensorValue))
+                                {
+                                    _sensorData[index].Item2 = sensorValue;
+                                }
+                            }
                         }
                     }
                 }
+
+                data = _sensorData;
+                return true;
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error reading LMSensors data: {ex.Message}");
+                data = Array.Empty<(string, float)>();
+                return false;
             }
         }
-
-        data = _sensorData;
-        return true;
-    }
-    catch (Exception ex)
-    {
-        Console.WriteLine($"Error reading LMSensors data: {ex.Message}");
-        data = [];
-        return false;
-    }
-}
     }
 }

@@ -22,7 +22,7 @@ namespace HwMonLinux
 
         private readonly List<string> _provideSensors;
 
-        private readonly string[] _sensorNames = [
+        private readonly string[] _sensorNames = {
             "temp.water",
             "temp.case",
             "temp.ambient",
@@ -32,7 +32,7 @@ namespace HwMonLinux
             "pwm.radiator-fans",
             "pwm.case-fans",
             "pwm.unused"
-        ];
+        };
 
         //Persistent memory to avoid reallocations
         private byte[] _receivedBuffer;
@@ -117,7 +117,7 @@ namespace HwMonLinux
                 if (!Connect())
                 {
                     Console.WriteLine($"Serial connection to {_portName} is not active. Skipping data retrieval.");
-                    data = [];
+                    data = Array.Empty<(string, float)>();
                     return false;
                 }
             }
@@ -147,7 +147,7 @@ namespace HwMonLinux
                 else
                 {
                     Console.WriteLine($"Error: Received bytes ({_bytesRead}) do not match the expected count ({_receivedBuffer.Length}).");
-                    data = [];
+                    data = Array.Empty<(string, float)>();
                     return false;
                 }
             }
@@ -159,7 +159,7 @@ namespace HwMonLinux
                 {
                     _serialPort.Close();
                 }
-                data = [];
+                data = Array.Empty<(string, float)>();
                 return false;
             }
         }
@@ -168,9 +168,9 @@ namespace HwMonLinux
         {
             if (_serialPort != null && _serialPort.IsOpen)
             {
-                _sensorData = [];
-                _unpackedData = [];
-                _receivedBuffer = [];
+                _sensorData = null;
+                _unpackedData = null;
+                _receivedBuffer = null;
                 _serialPort.Close();
                 _serialPort.Dispose();
                 _serialPort = null;

@@ -123,7 +123,7 @@ namespace HwMonLinux
                             }
                         }
                     }
-                    lines = [];
+                    lines = Array.Empty<string>();
                 }
                 catch (Exception ex)
                 {
@@ -132,7 +132,7 @@ namespace HwMonLinux
             }
             else
             {
-                data = [];
+                data = Array.Empty<(string, float)>();
                 Console.WriteLine("CPU Utilization on non-Unix systems requires platform-specific implementation for accurate historical comparison.");
                 return false;
             }

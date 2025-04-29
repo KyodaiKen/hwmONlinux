@@ -87,8 +87,8 @@ namespace HwMonLinux
             }
 
             // Nothing has been found for given provider name
-            counters = [];
-            data = [];
+            counters = null;
+            data = null;
             return false;
         }
     }

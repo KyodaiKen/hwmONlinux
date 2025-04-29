@@ -22,8 +22,8 @@ namespace HwMonLinux
         private int _outputBufferLength = 0;
         private bool _disposed = false;
         private (string, float)[] _sensorData;
-        private static readonly char[] _lineSeparators = ['\n'];
-        private static readonly char[] _csvSeparators = [','];
+        private static readonly char[] _lineSeparators = { '\n' };
+        private static readonly char[] _csvSeparators = { ',' };
         private Dictionary<int, string> _dynamicHeaderMap = new Dictionary<int, string>();
 
         private bool _headersRead = false;

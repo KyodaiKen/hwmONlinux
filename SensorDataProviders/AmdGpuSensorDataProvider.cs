@@ -136,7 +136,7 @@ namespace HwMonLinux
             catch (Exception ex)
             {
                 Console.WriteLine($"Error reading AMD GPU data: {ex.Message}");
-                data = [];
+                data = Array.Empty<(string, float)>();
                 return false;
             }
         }

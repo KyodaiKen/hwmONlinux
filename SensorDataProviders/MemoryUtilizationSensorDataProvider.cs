@@ -114,7 +114,7 @@ namespace HwMonLinux
             else
             {
                 Console.WriteLine("Memory utilization on non-Unix systems requires platform-specific implementation.");
-                data = [];
+                data = Array.Empty<(string, float)>();
                 return false;
             }
 

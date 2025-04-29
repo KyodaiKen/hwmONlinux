@@ -131,7 +131,7 @@ namespace HwMonLinux
                         }
                     }
                 }
-                procDiskStats = [];
+                procDiskStats = null;
             }
             catch (Exception ex)
             {

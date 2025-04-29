@@ -134,10 +134,8 @@ namespace HwMonLinux
             else
             {
                 response.StatusCode = (int)HttpStatusCode.NotFound;
-                string notFoundHtml = "<html><body><h1>404 Not Found</h1></body></html>";
-                byte[] buffer = Encoding.UTF8.GetBytes(notFoundHtml);
-                response.ContentLength64 = buffer.Length;
-                await response.OutputStream.WriteAsync(buffer, 0, buffer.Length);
+                byte[] htmlOut = Encoding.UTF8.GetBytes("<html><body><h1>404 Not Found</h1></body></html>");
+                await response.OutputStream.WriteAsync(htmlOut);
             }
         }
 

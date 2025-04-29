@@ -60,7 +60,7 @@ namespace HwMonLinux
                             _sensorData[j].Item2 = intValue;
                         }
                     }
-                    values = [];
+                    values.Clear();
                 }
                 data = _sensorData;
                 return true;
@@ -68,7 +68,7 @@ namespace HwMonLinux
             catch (Exception ex)
             {
                 Console.WriteLine($"Error reading NVIDIA SMI data: {ex.Message}");
-                data = [];
+                data = Array.Empty<(string, float)>();
                 return false;
             }
         }

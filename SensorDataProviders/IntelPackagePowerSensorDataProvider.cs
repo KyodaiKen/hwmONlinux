@@ -72,7 +72,7 @@ namespace HwMonLinux
             catch (Exception ex)
             {
                 Console.WriteLine($"Error reading Intel package power data from '{_energyFilePath}': {ex.Message}");
-                data = [];
+                data = Array.Empty<(string, float)>();
                 return false;
             }
         }
