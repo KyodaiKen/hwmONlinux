@@ -1,3 +1,5 @@
+using System;
+
 namespace HwMonLinux
 {
     public class InMemorySensorDataStore

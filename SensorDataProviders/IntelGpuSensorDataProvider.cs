@@ -41,7 +41,7 @@ namespace HwMonLinux
         {
             _process = new Process();
             _process.StartInfo.FileName = "/usr/bin/intel_gpu_top"; // Adjust path if necessary
-            _process.StartInfo.Arguments = "-c -s 800"; // Request CSV and set interval to 800ms
+            _process.StartInfo.Arguments = "-c -s 950"; // Request CSV and set interval to 950ms
             _process.StartInfo.RedirectStandardOutput = true;
             _process.StartInfo.RedirectStandardError = true;
             _process.StartInfo.UseShellExecute = false;

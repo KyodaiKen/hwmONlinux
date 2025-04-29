@@ -7,6 +7,8 @@ using System.Net;
 using System.Text;
 using System.Text.Json;
 using System.Buffers;
+using System.Threading;
+using System.Threading.Tasks;
 
 namespace HwMonLinux
 {

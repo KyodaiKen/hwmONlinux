@@ -72,12 +72,12 @@ namespace HwMonLinux
             if (providerConfig.TryGetValue("sensorLabels", out var sensorLabelsObj) && sensorLabelsObj is Dictionary<object, object> rawLabels)
             {
                 foreach (var entry in rawLabels)
-                {
-                    if (entry.Key != null)
                     {
-                        labels[entry.Key.ToString()] = entry.Value?.ToString() ?? "";
+                        if (entry.Key != null)
+                        {
+                            labels[entry.Key.ToString()] = entry.Value?.ToString() ?? "";
+                        }
                     }
-                }
             }
 
             // Capture the labels dictionary in a local variable
