@@ -50,7 +50,7 @@ namespace HwMonLinux
                             {
                                 // Set new value
                                 _data[p][s][_counters[p][s]].Item1 = DateTime.UtcNow;
-                                _data[p][s][_counters[p][s]].Item2 = providedData[s].Item2;
+                                _data[p][s][_counters[p][s]].Item2 = providedData[ps].Item2;
 
                                 if (_counters[p][s] == _retentionSeconds - 1)
                                 {
