@@ -48,9 +48,9 @@
         .chart-container {
             width: calc(12.5% - 6px); /* Default to three charts per line */
             height: auto;
-            min-height: 10em;
+            min-height: 8em;
             margin-bottom: 1.2em;
-            max-height: 10em;
+            max-height: 8em;
             box-sizing: border-box; /* Ensure padding and border are included in the width */
         }
 
@@ -197,7 +197,7 @@
                                         maintainAspectRatio: false,
                                         animation: false,
                                         scales: {
-                                            x: { type: 'category', display: true, ticks: { font: { size: 10 }, color: '#00bfff80' } },
+                                            x: { display: false /*, type: 'category', display: true, ticks: { font: { size: 10 }, color: '#00bfff80' }*/ },
                                             y: { beginAtZero: false, title: { display: false }, ticks: { font: { size: 11 }, color: '#00bfff80' } }
                                         },
                                         plugins: {
