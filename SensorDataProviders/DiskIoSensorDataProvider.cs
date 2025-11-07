@@ -1,6 +1,8 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Diagnostics;
+using System.Xml;
 
 namespace HwMonLinux
 {
@@ -26,27 +28,52 @@ namespace HwMonLinux
             _sensorData = new (string, float)[_provideSensors.Count];
         }
 
+        private string[] GetLsblk()
+        {
+            Process process = new();
+            process.StartInfo.FileName = "lsblk";
+            process.StartInfo.Arguments = "-o \"KNAME,UUID\"";
+            process.StartInfo.RedirectStandardOutput = true;
+            process.EnableRaisingEvents = true; // For Exited event
+
+            try
+            {
+                process.Start();
+                string[] output = process.StandardOutput.ReadToEnd().Split([Environment.NewLine], StringSplitOptions.RemoveEmptyEntries);
+                process.WaitForExit();
+                return output;
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error getting lsblk: {ex.Message}");
+                return [""];
+            }
+        }
+
         private List<string> GetMonitoredMountPoints()
         {
             var mountPoints = new List<string>();
             try
             {
-                var fstabContent = File.ReadAllLines("/etc/fstab");
-                foreach (var line in fstabContent)
+                var lsblk = GetLsblk();
+                int lni = 0;
+                foreach (var line in lsblk)
                 {
-                    if (!string.IsNullOrWhiteSpace(line) && !line.StartsWith("#"))
+                    lni++; //Skip header
+                    if (lni == 1) continue;
+                    if (!string.IsNullOrWhiteSpace(line) && !line.StartsWith('#'))
                     {
                         var parts = line.Split(new char[] { '\t', ' ' }, StringSplitOptions.RemoveEmptyEntries);
-                        if (parts.Length >= 2 && !parts[1].Contains("/run/user/") && !parts[1].StartsWith("/media/")) // Exclude user mounts and media mounts
+                        if (parts.Length == 2 && !parts[1].Contains("/run/user/") && !parts[1].StartsWith("/media/")) // Exclude user mounts and media mounts
                         {
-                            mountPoints.Add(parts[1]);
+                            mountPoints.Add(parts[1] + " /dev/" + parts[0]);
                         }
                     }
                 }
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Error reading /etc/fstab: {ex.Message}");
+                Console.WriteLine($"Error reading lsblk: {ex.Message}");
             }
             return mountPoints;
         }
@@ -59,11 +86,12 @@ namespace HwMonLinux
             int i = 0;
             foreach (var mountPoint in _mountPoints)
             {
-                if (_currentStats.TryGetValue(mountPoint, out var current))
+                string partUUID = mountPoint.Split(' ')[0];
+                string mntPntName = mountPoint.Split(' ')[1];
+                if (_currentStats.TryGetValue(mntPntName, out var current))
                 {
                     // Apply sensor name overrides
-                    string finalSensorName = mountPoint.Split('/')[2];
-                    if (_previousStats.TryGetValue(mountPoint, out var previous))
+                    if (_previousStats.TryGetValue(mntPntName, out var previous))
                     {
                         var timeDiff = now - previous.Timestamp;
                         if (timeDiff.TotalSeconds > 0)
@@ -73,37 +101,23 @@ namespace HwMonLinux
 
                             var readMBps = readDiffBytes / timeDiff.TotalSeconds / (1024 * 1024d);
                             var writeMBps = writeDiffBytes / timeDiff.TotalSeconds / (1024 * 1024d);
-                            
-                            if (_provideSensors.Contains(finalSensorName+".r"))
+
+                            if (_provideSensors.Contains($"{partUUID}.r"))
                             {
-                                _sensorData[i].Item1 = $"{finalSensorName}.r";
+                                _sensorData[i].Item1 = $"{partUUID}.r";
                                 _sensorData[i].Item2 = (float)Math.Round(readMBps, 3);
                                 i++;
                             }
 
-                            if (_provideSensors.Contains(finalSensorName+".w"))
+                            if (_provideSensors.Contains($"{partUUID}.w"))
                             {
-                                _sensorData[i].Item1 = $"{finalSensorName}.w";
+                                _sensorData[i].Item1 = $"{partUUID}.w";
                                 _sensorData[i].Item2 = (float)Math.Round(writeMBps, 3);
                                 i++;
                             }
                         }
                     }
-                    _previousStats[mountPoint] = (current.ReadBytes, current.WriteBytes, now);
-                }
-                else if (_previousStats.ContainsKey(mountPoint))
-                {
-                    _previousStats.Remove(mountPoint); // Disk might have been unmounted
-                }
-            }
-
-            // Add stats for disks that appeared since last check
-            foreach (var stat in _currentStats)
-            {
-                if (!_mountPoints.Contains(stat.Key) && !_previousStats.ContainsKey(stat.Key) && !stat.Key.Contains("/run/user/") && !stat.Key.StartsWith("/media/"))
-                {
-                    _mountPoints.Add(stat.Key);
-                    _previousStats[stat.Key] = (stat.Value.ReadBytes, stat.Value.WriteBytes, now);
+                    _previousStats[mntPntName] = (current.ReadBytes, current.WriteBytes, now);
                 }
             }
 
@@ -118,7 +132,7 @@ namespace HwMonLinux
                 var procDiskStats = File.ReadAllLines("/proc/diskstats");
                 foreach (var line in procDiskStats)
                 {
-                    var parts = line.Split(new char[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
+                    var parts = line.Split(' ', StringSplitOptions.RemoveEmptyEntries);
                     if (parts.Length >= 14)
                     {
                         var deviceName = parts[2];
