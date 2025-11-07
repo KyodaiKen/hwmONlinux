@@ -27,23 +27,26 @@ sensorData:
 # "HwMonLinux.NvidiaSmiSensorDataProvider, HwmONlinuxServer", providerName: "gpu.nvidia-smi"
 #   Uses "nvidia-smi" for gathering data. To get a list of supported sensors on your system, try to run: nvidia-smi --help-query-gpu
 
+# This section defines the configuration for the sensor providers.
+# You have to select the provided sensors, here for performance reasons.
+# Additionally, you can name the sensors, here.
 sensorProviders:
   # Personal fan controller made with an Arduino Nano. You can ignore this one.
-  - type: "HwMonLinux.KKFC01SensorDataProvider, HwmONlinuxServer"
-    config:
-      friendlyName: "Fan Controller FC02"
-      portName: "/dev/ttyUSB0"
-      baudRate: 115200
-      queryCommand: "bs"
-      identificationString: "KyoudaiKen FC02"
-      provideSensors:
-        - "temp.water"
-        - "temp.case"
-        - "temp.ambient"
-      sensorLabels:
-        "temp.water": "Water Temperature (°C)"
-        "temp.case": "Case Temperature (°C)"
-        "temp.ambient": "Ambient Temperature (°C)"
+  # - type: "HwMonLinux.KKFC01SensorDataProvider, HwmONlinuxServer"
+  #   config:
+  #     friendlyName: "Fan Controller FC02"
+  #     portName: "/dev/ttyUSB0"
+  #     baudRate: 115200
+  #     queryCommand: "bs"
+  #     identificationString: "KyoudaiKen FC02"
+  #     provideSensors:
+  #       - "temp.water"
+  #       - "temp.case"
+  #       - "temp.ambient"
+  #     sensorLabels:
+  #       "temp.water": "Water Temperature (°C)"
+  #       "temp.case": "Case Temperature (°C)"
+  #       "temp.ambient": "Ambient Temperature (°C)"
   - type: "HwMonLinux.LmsensorsSensorDataProvider, HwmONlinuxServer"
     config:
       friendlyName: "LMSensors"
@@ -144,38 +147,30 @@ sensorProviders:
     config:
       friendlyName: "Disk I/O"
       provideSensors:
-        - "nvme1n1.r"
-        - "nvme1n1.w"
-        - "nvme0n1.r"
-        - "nvme0n1.w"
-        - "nvme3n1.r"
-        - "nvme3n1.w"
-        - "nvme2n1.r"
-        - "nvme2n1.w"
+        #The system adds .r or .w for read and write to the UUID!
+        - "c9128c9a-51e9-42fd-aaaa-7874cff6d0f3.r"
+        - "c9128c9a-51e9-42fd-aaaa-7874cff6d0f3.w"
+        - "24AE8597AE856262.r"
       sensorLabels:
-        #The system adds .r or .w for read and write to the name!
-        "nvme0n1.r": "Windows Read (MB/s)"
-        "nvme0n1.w": "Windows (MB/s)"
-        "nvme1n1.r": "Data (MB/s)"
-        "nvme1n1.w": "Data (MB/s)"
-        "nvme2n1.r": "Fedora (MB/s)"
-        "nvme2n1.w": "Fedora (MB/s)"
-        "nvme3n1.r": "Games (MB/s)"
-        "nvme3n1.w": "Games (MB/s)"
+        #The system adds .r or .w for read and write to the UUID!
+        c9128c9a-51e9-42fd-aaaa-7874cff6d0f3.r: "Fedora (Read MB/s)"
+        c9128c9a-51e9-42fd-aaaa-7874cff6d0f3.w: "Fedora (Write MB/s)"
+        24AE8597AE856262.r: "Windows (Read MB/s)"
 
+# This section builds the dashboard. You can cherry pick for sensors here to be displayed in a grouped view.
 sensorGroups:
   #Sensor identifier: "{providerName}->{sensorName}"
-  - name: "system"
-    friendlyName: "System Temperatures & Fans"
-    sensorIdentifiers:
-      - "fan.controller.KKFC01->temp.water"
-      - "fan.controller.KKFC01->temp.case"
-      - "fan.controller.KKFC01->temp.ambient"
-      - "lmsensors->spd5118-i2c-14-51.temp1"
-      - "lmsensors->spd5118-i2c-14-53.temp1"
-      - "lmsensors->nct6798-isa-0290.PCH_CHIP_TEMP"
-      - "lmsensors->nct6798-isa-0290.fan2"
-      - "lmsensors->nct6798-isa-0290.fan7"
+  # - name: "system"
+  #   friendlyName: "System Temperatures & Fans"
+  #   sensorIdentifiers:
+  #     - "fan.controller.KKFC01->temp.water"
+  #     - "fan.controller.KKFC01->temp.case"
+  #     - "fan.controller.KKFC01->temp.ambient"
+  #     - "lmsensors->spd5118-i2c-14-51.temp1"
+  #     - "lmsensors->spd5118-i2c-14-53.temp1"
+  #     - "lmsensors->nct6798-isa-0290.PCH_CHIP_TEMP"
+  #     - "lmsensors->nct6798-isa-0290.fan2"
+  #     - "lmsensors->nct6798-isa-0290.fan7"
   - name: "cpu"
     friendlyName: "Intel Core i9-13900KS CPU"
     sensorIdentifiers:
@@ -213,14 +208,9 @@ sensorGroups:
       - "io.network->eno1.tx"
       - "io.network->eno2.rx"
       - "io.network->eno2.tx"
-  - name: "disk"
+  - name: "io.disks"
     friendlyName: "Disk I/O"
     sensorIdentifiers:
-      - "io.disks->nvme0n1.r"
-      - "io.disks->nvme0n1.w"
-      - "io.disks->nvme1n1.r"
-      - "io.disks->nvme1n1.w"
-      - "io.disks->nvme2n1.r"
-      - "io.disks->nvme2n1.w"
-      - "io.disks->nvme3n1.r"
-      - "io.disks->nvme3n1.w"
+      - "io.disks->c9128c9a-51e9-42fd-aaaa-7874cff6d0f3.r"
+      - "io.disks->c9128c9a-51e9-42fd-aaaa-7874cff6d0f3.w"
+      - "io.disks->24AE8597AE856262.r"

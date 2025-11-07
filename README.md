@@ -21,6 +21,8 @@ HwMonLinux is a lightweight and extensible web-based hardware monitoring tool de
 * **`intel-gpu-tools` (Optional):** For more detailed Intel GPU monitoring, you might want to install `intel-gpu-tools` (`sudo apt install intel-gpu-tools`). **Requires root privileges**
 * **`nvidia-smi`** For NVidia GPUs only. It usually comes with the official NVidia GPU driver for Linux.
 
+Please be aware that some sensor providers require root access!
+
 #### Building and installing from GIT
 
 1.  **Clone the Repository:**
