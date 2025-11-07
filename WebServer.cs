@@ -241,17 +241,17 @@ namespace HwMonLinux
                             if (sensorData != null && sensorData.Length > 0)
                             {
                                 _sensorDataStore.StoreSensorDataFromProvider(provider.Name, sensorData);
-                                Console.WriteLine($"[{DateTime.Now}] Sensor '{provider.Name}': Gathered data for {sensorData.Length} sensors.");
+                                Console.WriteLine($"[{DateTime.Now}] Provider: '{provider.Name}': Gathered data for {sensorData.Length} sensors.");
                             }
                             else
                             {
-                                Console.WriteLine($"[{DateTime.Now}] Sensor '{provider.Name}': No sensor data received.");
+                                Console.WriteLine($"[{DateTime.Now}] Provider: '{provider.Name}': No sensor data received.");
                             }
                         }
                     }
                     catch (Exception ex)
                     {
-                        Console.WriteLine($"Error polling sensor '{provider.Name}': {ex.Message}");
+                        Console.WriteLine($"Error polling sensors for provider '{provider.Name}': {ex.Message}");
                     }
                 }
                 GC.Collect();
