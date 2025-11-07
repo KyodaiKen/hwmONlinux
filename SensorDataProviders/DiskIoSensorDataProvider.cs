@@ -86,12 +86,13 @@ namespace HwMonLinux
             int i = 0;
             foreach (var mountPoint in _mountPoints)
             {
-                string partUUID = mountPoint.Split(' ')[0];
-                string mntPntName = mountPoint.Split(' ')[1];
-                if (_currentStats.TryGetValue(mntPntName, out var current))
+                string[] partInfo = mountPoint.Split(' ');
+                string partUUID = partInfo[0];
+                string partKrnlName = partInfo[1];
+                if (_currentStats.TryGetValue(partKrnlName, out var current))
                 {
                     // Apply sensor name overrides
-                    if (_previousStats.TryGetValue(mntPntName, out var previous))
+                    if (_previousStats.TryGetValue(partKrnlName, out var previous))
                     {
                         var timeDiff = now - previous.Timestamp;
                         if (timeDiff.TotalSeconds > 0)
@@ -117,7 +118,7 @@ namespace HwMonLinux
                             }
                         }
                     }
-                    _previousStats[mntPntName] = (current.ReadBytes, current.WriteBytes, now);
+                    _previousStats[partKrnlName] = (current.ReadBytes, current.WriteBytes, now);
                 }
             }
 
